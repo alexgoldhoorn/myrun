@@ -1,0 +1,104 @@
+"""Configuration: one YAML file kept outside the repo."""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import yaml
+
+DEFAULT_CONFIG = "~/dockers/myrun/config.yaml"
+RUN_SPORTS = ("Run", "TrailRun")
+
+
+class ConfigError(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class Config:
+    strava_db: Path
+    cache_dir: Path = Path(os.path.expanduser("~/.cache/myrun"))
+    wellness_parquet: Path | None = None
+    plan_csv: Path | None = None
+    race_log_csv: Path | None = None
+    garmin_activities_parquet: Path | None = None
+    race_log_columns: dict[str, str] = field(default_factory=dict)
+    race_log_date_format: str = "%d/%m/%Y"
+    sfs_url: str | None = None
+    hr_zone_upper_bounds: tuple[int, ...] = (125, 145, 160, 172)
+    easy_hr_band: tuple[int, int] = (125, 148)
+    mixed_hilliness_m_per_km: float = 15.0
+    efficiency_max_hilliness_m_per_km: float = 10.0
+    grade_class_m_per_km: float = 20.0
+    load_bands: tuple[float, float, float] = (0.8, 1.3, 1.5)
+    stale_hours: float = 36.0
+    garmin_join_tolerance_s: int = 120
+
+
+_TOP = {"strava_db", "cache_dir", "inputs", "race_log_columns", "race_log_date_format", "links",
+        "hr", "thresholds"}
+_INPUTS = {"wellness_parquet", "plan_csv", "race_log_csv", "garmin_activities_parquet"}
+_LINKS = {"statistics_for_strava_url"}
+_HR = {"zone_upper_bounds", "easy_band"}
+_THRESHOLDS = {"mixed_hilliness_m_per_km", "efficiency_max_hilliness_m_per_km",
+               "grade_class_m_per_km", "load_bands", "stale_hours", "garmin_join_tolerance_s"}
+
+
+def _path(value) -> Path | None:
+    return Path(os.path.expanduser(str(value))) if value else None
+
+
+def _section(raw: dict, name: str, allowed: set[str], source: Path) -> dict:
+    section = raw.get(name) or {}
+    if not isinstance(section, dict):
+        raise ConfigError(f"{source}: '{name}' must be a mapping")
+    unknown = sorted(set(section) - allowed)
+    if unknown:
+        raise ConfigError(f"{source}: unknown key(s) in '{name}': {', '.join(unknown)}")
+    return section
+
+
+def load_config(path: str | Path | None = None) -> Config:
+    source = Path(os.path.expanduser(str(path or os.environ.get("MYRUN_CONFIG") or DEFAULT_CONFIG)))
+    if not source.is_file():
+        raise ConfigError(f"config file not found: {source}")
+    raw = yaml.safe_load(source.read_text()) or {}
+    if not isinstance(raw, dict):
+        raise ConfigError(f"{source}: the file must contain a mapping")
+    unknown = sorted(set(raw) - _TOP)
+    if unknown:
+        raise ConfigError(f"{source}: unknown key(s): {', '.join(unknown)}")
+    if not raw.get("strava_db"):
+        raise ConfigError(f"{source}: 'strava_db' is required")
+
+    inputs = _section(raw, "inputs", _INPUTS, source)
+    links = _section(raw, "links", _LINKS, source)
+    hr = _section(raw, "hr", _HR, source)
+    thresholds = _section(raw, "thresholds", _THRESHOLDS, source)
+
+    kwargs: dict = {"strava_db": _path(raw["strava_db"])}
+    if raw.get("cache_dir"):
+        kwargs["cache_dir"] = _path(raw["cache_dir"])
+    for key in _INPUTS:
+        kwargs[key] = _path(inputs.get(key))
+    if raw.get("race_log_columns"):
+        kwargs["race_log_columns"] = dict(raw["race_log_columns"])
+    if raw.get("race_log_date_format"):
+        kwargs["race_log_date_format"] = str(raw["race_log_date_format"])
+    if links.get("statistics_for_strava_url"):
+        kwargs["sfs_url"] = str(links["statistics_for_strava_url"]).rstrip("/")
+    if hr.get("zone_upper_bounds"):
+        kwargs["hr_zone_upper_bounds"] = tuple(int(v) for v in hr["zone_upper_bounds"])
+    if hr.get("easy_band"):
+        low, high = hr["easy_band"]
+        kwargs["easy_hr_band"] = (int(low), int(high))
+    for key in _THRESHOLDS - {"load_bands", "garmin_join_tolerance_s"}:
+        if key in thresholds:
+            kwargs[key] = float(thresholds[key])
+    if "load_bands" in thresholds:
+        kwargs["load_bands"] = tuple(float(v) for v in thresholds["load_bands"])
+    if "garmin_join_tolerance_s" in thresholds:
+        kwargs["garmin_join_tolerance_s"] = int(thresholds["garmin_join_tolerance_s"])
+    return Config(**kwargs)
