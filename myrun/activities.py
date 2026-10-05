@@ -8,6 +8,7 @@ import pandas as pd
 
 from myrun import derive
 from myrun.config import RUN_SPORTS, Config, load_config
+from myrun.optional import enrich
 from myrun.stravadb import open_db
 
 # Strava reports cadence for these as one leg per minute.
@@ -67,7 +68,7 @@ def activities(sports=None, since=None, *, cfg: Config | None = None) -> pd.Data
 
     df["hilliness_m_km"] = derive.hilliness(df["elevation_m"], df["distance_km"])
     df["surface"] = derive.surface(df["sport"], df["hilliness_m_km"], cfg.mixed_hilliness_m_per_km)
-    df["session_type"] = None
+    df = enrich(df, cfg)
 
     if sports is not None:
         df = df[df["sport"].isin(list(sports))]
