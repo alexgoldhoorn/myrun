@@ -76,6 +76,14 @@ def read_wellness(cfg: Config, now: float | None = None):
         df = pd.read_parquet(path)
     except Exception as exc:
         return _error(name, f"cannot read {path.name}: {exc}")
+    if cfg.wellness_columns:
+        absent = [src for src in cfg.wellness_columns.values() if src not in df.columns]
+        if absent:
+            return _error(name, f"{path.name} lacks mapped column(s): "
+                                f"{', '.join(map(repr, absent))}")
+        df = pd.DataFrame({field: df[src] for field, src in cfg.wellness_columns.items()})
+    if "sleep_seconds" in df.columns and "sleep_hours" not in df.columns:
+        df["sleep_hours"] = pd.to_numeric(df["sleep_seconds"], errors="coerce") / 3600
     if "date" not in df.columns:
         return _error(name, f"{path.name} has no 'date' column")
     present = [c for c in WELLNESS_COLUMNS if c in df.columns]

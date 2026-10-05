@@ -26,6 +26,7 @@ class Config:
     garmin_activities_parquet: Path | None = None
     race_log_columns: dict[str, str] = field(default_factory=dict)
     race_log_date_format: str = "%d/%m/%Y"
+    wellness_columns: dict[str, str] = field(default_factory=dict)
     sfs_url: str | None = None
     max_hr: int | None = None                           # None: observed from recent runs
     hr_zone_upper_bounds: tuple[int, ...] | None = None  # None: calculated from max_hr
@@ -38,13 +39,15 @@ class Config:
     garmin_join_tolerance_s: int = 120
 
 
-_TOP = {"strava_db", "cache_dir", "inputs", "race_log_columns", "race_log_date_format", "links",
+_TOP = {"strava_db", "cache_dir", "inputs", "race_log_columns", "race_log_date_format", "wellness_columns", "links",
         "hr", "thresholds"}
 _INPUTS = {"wellness_parquet", "plan_csv", "race_log_csv", "garmin_activities_parquet"}
 _LINKS = {"statistics_for_strava_url"}
 _HR = {"max_hr", "zone_upper_bounds", "easy_band"}
 _THRESHOLDS = {"mixed_hilliness_m_per_km", "efficiency_max_hilliness_m_per_km",
                "grade_class_m_per_km", "load_bands", "stale_hours", "garmin_join_tolerance_s"}
+
+WELLNESS_FIELDS = ("date", "readiness", "sleep_hours", "sleep_seconds", "hrv_ms", "resting_hr")
 
 
 def _path(value) -> Path | None:
@@ -88,6 +91,13 @@ def load_config(path: str | Path | None = None) -> Config:
         kwargs["race_log_columns"] = dict(raw["race_log_columns"])
     if raw.get("race_log_date_format"):
         kwargs["race_log_date_format"] = str(raw["race_log_date_format"])
+    if raw.get("wellness_columns"):
+        mapping = dict(raw["wellness_columns"])
+        unknown = sorted(set(mapping) - set(WELLNESS_FIELDS))
+        if unknown:
+            raise ConfigError(f"{source}: unknown field(s) in 'wellness_columns': "
+                              f"{', '.join(unknown)}; allowed: {', '.join(WELLNESS_FIELDS)}")
+        kwargs["wellness_columns"] = mapping
     if links.get("statistics_for_strava_url"):
         kwargs["sfs_url"] = str(links["statistics_for_strava_url"]).rstrip("/")
     if hr.get("max_hr"):

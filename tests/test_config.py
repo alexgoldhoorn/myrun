@@ -74,3 +74,12 @@ def test_env_var_selects_the_file(tmp_path, monkeypatch):
 def test_max_hr_is_read(tmp_path):
     cfg = load_config(_write(tmp_path, "strava_db: /d.db\nhr: {max_hr: 178}\n"))
     assert cfg.max_hr == 178 and cfg.hr_zone_upper_bounds is None
+
+
+def test_wellness_columns_are_read_and_validated(tmp_path):
+    cfg = load_config(_write(tmp_path, "strava_db: /d.db\n"
+                                       "wellness_columns: {date: local_date, hrv_ms: hrv}\n"))
+    assert cfg.wellness_columns == {"date": "local_date", "hrv_ms": "hrv"}
+    with pytest.raises(ConfigError, match="body_battery"):
+        load_config(_write(tmp_path, "strava_db: /d.db\n"
+                                     "wellness_columns: {body_battery: bb}\n"))

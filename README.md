@@ -25,7 +25,7 @@ Four more inputs are optional. Leave one out and its panels disappear.
 
 | Input | Format | Columns |
 |---|---|---|
-| Wellness | Parquet, one row per day | `date`, and any of `readiness`, `sleep_hours`, `hrv_ms`, `resting_hr` |
+| Wellness | Parquet, one row per day | `date`, and any of `readiness`, `sleep_hours`, `hrv_ms`, `resting_hr`; other names can be mapped in the config |
 | Plan | CSV | `date` (ISO), `session`, `type` (for example `easy`, `tempo`, `intervals`, `long`, `race`, `rest`), `distance_km` |
 | Race log | CSV with your own headers, mapped in the config | at least a name and a date; optionally type, distance, official time, rank percentile, links |
 | Garmin activities | Parquet, one row per activity | `start` (local time), and any of `garmin_activity_id`, `session_name`, `session_type`, `vertical_oscillation_cm`, `ground_contact_ms`, `stride_length_m` |

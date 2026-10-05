@@ -22,6 +22,13 @@ race_log_columns:                     # field: header in your CSV. name and date
   garmin_url: garmin_url
 race_log_date_format: "%d/%m/%Y"
 
+wellness_columns:                     # only if your file uses other names. field: your column
+  # date: local_date
+  # readiness: readiness_score
+  # hrv_ms: hrv_last_night_ms
+  # resting_hr: resting_hr
+  # sleep_seconds: sleep_s            # converted to sleep_hours
+
 links:
   statistics_for_strava_url: http://localhost:8080
 

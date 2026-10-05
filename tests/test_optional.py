@@ -196,3 +196,29 @@ def test_garmin_start_with_a_timezone_is_an_error(cfg, tmp_path):
                   "garmin_activity_id": [1]}).to_parquet(path)
     df, state = optional.read_garmin_activities(with_inputs(cfg, garmin_activities_parquet=path))
     assert df is None and state.status == "error" and "timezone" in state.message
+
+
+def test_wellness_column_mapping(cfg, tmp_path):
+    frame = pd.DataFrame({"local_date": ["2026-10-04", "2026-10-05"],
+                          "readiness_score": [70.0, 81.0], "hrv_last_night_ms": [48.0, 52.0],
+                          "resting_hr": [47.0, 46.0], "sleep_s": [27000.0, 25200.0],
+                          "steps": [9000, 12000]})
+    mapping = {"date": "local_date", "readiness": "readiness_score",
+               "hrv_ms": "hrv_last_night_ms", "resting_hr": "resting_hr",
+               "sleep_seconds": "sleep_s"}
+    c = with_inputs(cfg, wellness_parquet=_wellness_file(tmp_path, frame),
+                    wellness_columns=mapping)
+    df, state = optional.read_wellness(c)
+    assert state.status == "ok"
+    assert df["date"].tolist() == list(pd.to_datetime(["2026-10-04", "2026-10-05"]))
+    assert df["readiness"].tolist() == [70.0, 81.0]
+    assert df["hrv_ms"].tolist() == [48.0, 52.0]
+    assert df["sleep_hours"].tolist() == [7.5, 7.0]
+
+
+def test_wellness_mapping_naming_an_absent_column_is_an_error(cfg, tmp_path):
+    frame = pd.DataFrame({"local_date": ["2026-10-05"], "readiness_score": [70.0]})
+    c = with_inputs(cfg, wellness_parquet=_wellness_file(tmp_path, frame),
+                    wellness_columns={"date": "local_date", "hrv_ms": "hrv_nightly"})
+    df, state = optional.read_wellness(c)
+    assert df is None and state.status == "error" and "hrv_nightly" in state.message
