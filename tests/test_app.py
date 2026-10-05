@@ -11,7 +11,7 @@ from tests.fixture import (RACE_COLUMNS, build_fixture, write_garmin, write_plan
                            write_wellness)
 
 ROOT = Path(__file__).resolve().parents[1]
-PAGES = ["Now.py", "pages/1_Trends.py", "pages/2_Activity.py"]
+PAGES = ["Now.py", "pages/1_Trends.py", "pages/2_Activity.py", "pages/3_Explore.py"]
 
 
 def write_config(tmp_path, db, **inputs) -> Path:
@@ -152,3 +152,21 @@ def test_activity_page_handles_an_activity_without_stream_data(baseline):
     at.selectbox[0].select(target).run()
     assert not at.exception
     assert "no stream data" in _text(at)
+
+
+def test_explore_page_per_km_level(baseline):
+    at = run_page("pages/3_Explore.py")
+    at.radio[0].set_value("per km").run()
+    assert not at.exception
+    group = next(s for s in at.selectbox if s.label == "Group by")
+    assert "Climb or descent" in group.options
+
+
+def test_explore_page_offers_dynamics_only_with_the_garmin_input(baseline):
+    y = next(s for s in run_page("pages/3_Explore.py").selectbox if s.label == "Y")
+    assert "ground_contact_ms" not in y.options
+
+
+def test_explore_page_offers_dynamics_with_the_garmin_input(everything):
+    y = next(s for s in run_page("pages/3_Explore.py").selectbox if s.label == "Y")
+    assert "ground_contact_ms" in y.options

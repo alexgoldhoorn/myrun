@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+
+from myrun import explore
 
 
 def load_bars(weekly: pd.DataFrame) -> go.Figure:
@@ -68,4 +71,36 @@ def zone_bar(zones: pd.DataFrame) -> go.Figure:
                            text=[f"{p:.0f}%" for p in zones["pct"]],
                            hovertemplate="%{y}: %{x:.0f} min<extra></extra>"))
     fig.update_layout(height=220, margin=dict(l=10, r=10, t=10, b=10), xaxis_title="Minutes")
+    return fig
+
+
+MIN_TREND_POINTS = 3
+
+
+def explore_figure(df: pd.DataFrame, x: str, y: str, group: pd.Series | None = None) -> go.Figure:
+    """Scatter with a straight fitted line per group, or box plots when x is a category."""
+    data = pd.DataFrame({"x": df[x], "y": pd.to_numeric(df[y], errors="coerce")})
+    data["group"] = "all" if group is None else group.reindex(df.index)
+    data = data.dropna(subset=["x", "y", "group"])
+    fig = go.Figure()
+    names = explore.ordered(data["group"])
+    if not pd.api.types.is_numeric_dtype(df[x]):
+        for name in names:
+            part = data[data["group"] == name]
+            fig.add_trace(go.Box(x=list(part["x"].astype(str)), y=list(part["y"]), name=name))
+        fig.update_layout(boxmode="group")
+    else:
+        for name in names:
+            part = data[data["group"] == name]
+            xs, ys = part["x"].astype(float), part["y"]
+            fig.add_trace(go.Scatter(x=list(xs), y=list(ys), mode="markers", name=name,
+                                     legendgroup=name, opacity=0.7))
+            if len(part) >= MIN_TREND_POINTS and xs.nunique() > 1:
+                slope, intercept = np.polyfit(xs, ys, 1)
+                ends = np.array([xs.min(), xs.max()])
+                fig.add_trace(go.Scatter(x=list(ends), y=list(slope * ends + intercept),
+                                         mode="lines", legendgroup=name, showlegend=False,
+                                         hoverinfo="skip"))
+    fig.update_layout(height=520, margin=dict(l=10, r=10, t=10, b=10), xaxis_title=x,
+                      yaxis_title=y, showlegend=group is not None)
     return fig

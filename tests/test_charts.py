@@ -51,3 +51,28 @@ def test_zone_bar():
                           "seconds": [600.0, 1200.0], "pct": [33.3, 66.7]})
     fig = charts.zone_bar(zones)
     assert list(fig.data[0].x) == [10.0, 20.0]          # minutes
+
+
+def test_explore_figure_scatter_with_trend_per_group():
+    df = pd.DataFrame({"temp_c": [5.0, 10.0, 15.0, 20.0, 6.0, 11.0, 16.0],
+                       "pace_min_km": [5.0, 5.1, 5.3, 5.6, 6.0, 6.2, 6.5]})
+    group = pd.Series(["road"] * 4 + ["trail"] * 3)
+    fig = charts.explore_figure(df, "temp_c", "pace_min_km", group)
+    assert len(fig.data) == 4                              # points and a line, per group
+    assert len(charts.explore_figure(df, "temp_c", "pace_min_km").data) == 2
+
+
+def test_explore_figure_no_trend_line_for_too_few_points():
+    df = pd.DataFrame({"x": [1.0, 2.0], "y": [1.0, 2.0]})
+    assert len(charts.explore_figure(df, "x", "y").data) == 1
+
+
+def test_explore_figure_box_for_a_category():
+    df = pd.DataFrame({"surface": ["road", "road", "trail"], "avg_hr": [140, 145, 155]})
+    fig = charts.explore_figure(df, "surface", "avg_hr")
+    assert fig.data[0].type == "box"
+
+
+def test_explore_figure_ignores_rows_with_missing_values():
+    df = pd.DataFrame({"x": [1.0, 2.0, 3.0, None], "y": [1.0, None, 3.0, 4.0]})
+    assert list(charts.explore_figure(df, "x", "y").data[0].x) == [1.0, 3.0]
