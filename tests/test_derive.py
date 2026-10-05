@@ -15,6 +15,7 @@ def test_surface():
     sport = pd.Series(["Run", "Run", "TrailRun", "Ride", "Run"])
     hill = pd.Series([4.0, 15.0, 40.0, 30.0, np.nan])
     assert derive.surface(sport, hill, 15.0).tolist() == ["road", "mixed", "trail", None, "road"]
+    assert derive.surface(sport, hill, None).tolist() == ["road", "road", "trail", None, "road"]
 
 
 def test_grade_class_is_per_km():

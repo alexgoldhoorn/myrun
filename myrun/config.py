@@ -27,10 +27,11 @@ class Config:
     race_log_columns: dict[str, str] = field(default_factory=dict)
     race_log_date_format: str = "%d/%m/%Y"
     sfs_url: str | None = None
-    hr_zone_upper_bounds: tuple[int, ...] = (125, 145, 160, 172)
-    easy_hr_band: tuple[int, int] = (125, 148)
-    mixed_hilliness_m_per_km: float = 15.0
-    efficiency_max_hilliness_m_per_km: float = 10.0
+    max_hr: int | None = None                           # None: observed from recent runs
+    hr_zone_upper_bounds: tuple[int, ...] | None = None  # None: calculated from max_hr
+    easy_hr_band: tuple[int, int] | None = None          # None: calculated from max_hr
+    mixed_hilliness_m_per_km: float | None = None        # None: surface is the sport type only
+    efficiency_max_hilliness_m_per_km: float = 20.0
     grade_class_m_per_km: float = 20.0
     load_bands: tuple[float, float, float] = (0.8, 1.3, 1.5)
     stale_hours: float = 36.0
@@ -41,7 +42,7 @@ _TOP = {"strava_db", "cache_dir", "inputs", "race_log_columns", "race_log_date_f
         "hr", "thresholds"}
 _INPUTS = {"wellness_parquet", "plan_csv", "race_log_csv", "garmin_activities_parquet"}
 _LINKS = {"statistics_for_strava_url"}
-_HR = {"zone_upper_bounds", "easy_band"}
+_HR = {"max_hr", "zone_upper_bounds", "easy_band"}
 _THRESHOLDS = {"mixed_hilliness_m_per_km", "efficiency_max_hilliness_m_per_km",
                "grade_class_m_per_km", "load_bands", "stale_hours", "garmin_join_tolerance_s"}
 
@@ -89,13 +90,15 @@ def load_config(path: str | Path | None = None) -> Config:
         kwargs["race_log_date_format"] = str(raw["race_log_date_format"])
     if links.get("statistics_for_strava_url"):
         kwargs["sfs_url"] = str(links["statistics_for_strava_url"]).rstrip("/")
+    if hr.get("max_hr"):
+        kwargs["max_hr"] = int(hr["max_hr"])
     if hr.get("zone_upper_bounds"):
         kwargs["hr_zone_upper_bounds"] = tuple(int(v) for v in hr["zone_upper_bounds"])
     if hr.get("easy_band"):
         low, high = hr["easy_band"]
         kwargs["easy_hr_band"] = (int(low), int(high))
     for key in _THRESHOLDS - {"load_bands", "garmin_join_tolerance_s"}:
-        if key in thresholds:
+        if thresholds.get(key) is not None:
             kwargs[key] = float(thresholds[key])
     if "load_bands" in thresholds:
         kwargs["load_bands"] = tuple(float(v) for v in thresholds["load_bands"])

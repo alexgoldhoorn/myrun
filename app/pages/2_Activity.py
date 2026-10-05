@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 
 from myrun import links, optional, streams
+from myrun.hr import hr_settings
 from myrun.ui import charts, common
 
 cfg = common.setup("Activity")
@@ -71,7 +72,13 @@ st.plotly_chart(charts.stream_figure(data, x=axis, overlay=overlay))
 left, right = st.columns(2)
 with left:
     st.subheader("Time in HR zones")
-    st.plotly_chart(charts.zone_bar(streams.zone_seconds(data, cfg.hr_zone_upper_bounds)))
+    heart = hr_settings(cfg, acts)
+    if heart.zone_upper_bounds is None:
+        st.caption(f"Zones {heart.source}.")
+    else:
+        st.plotly_chart(charts.zone_bar(streams.zone_seconds(data, heart.zone_upper_bounds)))
+        edges = ", ".join(str(b) for b in heart.zone_upper_bounds)
+        st.caption(f"Zones end at {edges} bpm; {heart.source}.")
 with right:
     st.subheader("HR drift")
     drift = streams.drift_pct(data)

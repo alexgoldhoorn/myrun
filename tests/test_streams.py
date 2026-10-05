@@ -73,3 +73,12 @@ def test_laps(cfg):
     assert laps["distance_km"].tolist() == [3.6, 3.6]
     assert laps["pace_min_km"].iloc[0] == pytest.approx(1200 / 60 / 3.6)
     assert streams.activity_laps(GYM, cfg=cfg).empty
+
+
+def test_hr_zones_without_any_heart_rate_settings_is_empty(tmp_path):
+    from myrun.config import Config
+    from tests.fixture import TODAY, build_fixture
+
+    cfg = Config(strava_db=build_fixture(tmp_path / "e.db", TODAY, empty=True),
+                 cache_dir=tmp_path / "c")
+    assert streams.hr_zones("activity-1", cfg=cfg).empty

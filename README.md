@@ -60,8 +60,11 @@ See `examples/notebook_example.py`.
   visit to the per-km view takes a while; delete the cache to rebuild it.
 - Load is Strava's relative effort. Activities without it are not counted, and the
   page says how many.
-- Surface is `trail` for trail runs, `mixed` for runs above a configurable climb per
-  km, otherwise `road`. A race log entry overrides it.
+- Surface follows the Strava sport type: `road` for Run, `trail` for Trail Run. A race
+  log entry can override it, and you can opt in to a `mixed` label for hilly road runs.
+- Heart-rate zones are 60/70/80/90 % of your maximum heart rate, taken from your runs
+  of the last 12 months unless you set a maximum or your own zones in the config.
+  Each page says which is in use.
 
 ## Development
 

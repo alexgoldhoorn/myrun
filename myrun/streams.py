@@ -10,6 +10,7 @@ import pandas as pd
 
 from myrun.activities import CADENCE_DOUBLED
 from myrun.config import Config, load_config
+from myrun.hr import hr_settings
 from myrun.stravadb import decode_blob, open_db
 
 COLUMNS = ["time_s", "distance_m", "hr", "speed_ms", "pace_min_km", "altitude_m", "cadence_spm",
@@ -110,7 +111,10 @@ def drift_pct(streams_df: pd.DataFrame, min_minutes: float = 30) -> float | None
 
 def hr_zones(activity_id: str, *, cfg: Config | None = None) -> pd.DataFrame:
     cfg = cfg or load_config()
-    return zone_seconds(activity_streams(activity_id, cfg=cfg), cfg.hr_zone_upper_bounds)
+    bounds = hr_settings(cfg).zone_upper_bounds
+    if bounds is None:
+        return pd.DataFrame(columns=["zone", "lower", "upper", "seconds", "pct"])
+    return zone_seconds(activity_streams(activity_id, cfg=cfg), bounds)
 
 
 def hr_drift(activity_id: str, *, cfg: Config | None = None) -> float | None:

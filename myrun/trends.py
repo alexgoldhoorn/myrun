@@ -8,6 +8,7 @@ import pandas as pd
 
 from myrun.activities import activities as _load
 from myrun.config import RUN_SPORTS, Config, load_config
+from myrun.hr import hr_settings
 from myrun.stravadb import open_db
 
 _FREQ = {"week": "W-SUN", "month": "M", "year": "Y"}
@@ -69,7 +70,10 @@ def aerobic_efficiency(*, activities: pd.DataFrame | None = None,
     """Monthly median of speed (m/min) per heartbeat on easy, flat road runs."""
     cfg = cfg or load_config()
     acts = activities if activities is not None else _load(cfg=cfg)
-    low, high = cfg.easy_hr_band
+    band = hr_settings(cfg, acts).easy_band
+    if band is None:
+        return pd.DataFrame(columns=["month", "efficiency", "n_runs", "median_pace_min_km"])
+    low, high = band
     easy = acts[
         (acts["sport"] == "Run")
         & (acts["duration_min"] >= MIN_EFFICIENCY_MINUTES)

@@ -14,7 +14,9 @@ def test_minimal_config_gets_defaults(tmp_path):
     assert str(cfg.strava_db) == "/data/strava.db"
     assert cfg.wellness_parquet is None
     assert cfg.load_bands == (0.8, 1.3, 1.5)
-    assert cfg.mixed_hilliness_m_per_km == 15.0
+    assert cfg.mixed_hilliness_m_per_km is None       # surface comes from the sport type
+    assert cfg.hr_zone_upper_bounds is None and cfg.easy_hr_band is None and cfg.max_hr is None
+    assert cfg.efficiency_max_hilliness_m_per_km == 20.0
     assert cfg.stale_hours == 36.0
 
 
@@ -67,3 +69,8 @@ def test_unknown_key_is_an_error_naming_the_key(tmp_path, text, key):
 def test_env_var_selects_the_file(tmp_path, monkeypatch):
     monkeypatch.setenv("MYRUN_CONFIG", str(_write(tmp_path, "strava_db: /env.db\n")))
     assert str(load_config().strava_db) == "/env.db"
+
+
+def test_max_hr_is_read(tmp_path):
+    cfg = load_config(_write(tmp_path, "strava_db: /d.db\nhr: {max_hr: 178}\n"))
+    assert cfg.max_hr == 178 and cfg.hr_zone_upper_bounds is None

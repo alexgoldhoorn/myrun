@@ -208,3 +208,8 @@ def test_explore_page_offers_dynamics_only_with_the_garmin_input(baseline):
 def test_explore_page_offers_dynamics_with_the_garmin_input(everything):
     y = next(s for s in run_page("pages/3_Explore.py").selectbox if s.label == "Y")
     assert "ground_contact_ms" in y.options
+
+
+def test_pages_say_where_the_hr_zones_come_from(baseline):
+    assert "observed" in _text(run_page("pages/2_Activity.py"))
+    assert "observed" in _text(run_page("pages/1_Trends.py"))

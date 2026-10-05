@@ -11,4 +11,5 @@ def db_path(tmp_path):
 
 @pytest.fixture
 def cfg(tmp_path, db_path):
-    return Config(strava_db=db_path, cache_dir=tmp_path / "cache")
+    return Config(strava_db=db_path, cache_dir=tmp_path / "cache",
+                  hr_zone_upper_bounds=(125, 145, 160, 172), easy_hr_band=(125, 148))

@@ -6,6 +6,7 @@ import streamlit as st
 
 from myrun import optional, trends
 from myrun.config import RUN_SPORTS
+from myrun.hr import hr_settings
 from myrun.ui import common
 
 cfg = common.setup("Trends")
@@ -22,13 +23,20 @@ runs = acts[acts["sport"].isin(RUN_SPORTS)]
 
 # ---- aerobic efficiency ---------------------------------------------------
 st.subheader("Aerobic efficiency")
-low, high = cfg.easy_hr_band
-st.caption(f"Metres per minute per heartbeat on easy road runs: average HR {low} to {high}, at "
-           f"least {trends.MIN_EFFICIENCY_MINUTES} minutes, under "
-           f"{cfg.efficiency_max_hilliness_m_per_km:g} m of climb per km. Higher is fitter.")
+heart = hr_settings(cfg, acts)
 efficiency = trends.aerobic_efficiency(activities=acts, cfg=cfg)
-if efficiency.empty:
-    st.info("No runs qualify. Check the easy HR band in the config.")
+if heart.easy_band is None:
+    st.info(f"Easy heart-rate band {heart.source}.")
+else:
+    low, high = heart.easy_band
+    st.caption(f"Metres per minute per heartbeat on easy road runs: average HR {low} to {high}, "
+               f"at least {trends.MIN_EFFICIENCY_MINUTES} minutes, under "
+               f"{cfg.efficiency_max_hilliness_m_per_km:g} m of climb per km. Higher is fitter. "
+               f"The HR band is {heart.source}.")
+if heart.easy_band is None:
+    pass
+elif efficiency.empty:
+    st.info("No runs qualify. Set hr.easy_band in the config if the band above is not yours.")
 else:
     st.plotly_chart(px.line(efficiency, x="month", y="efficiency", markers=True,
                             hover_data=["n_runs", "median_pace_min_km"]))

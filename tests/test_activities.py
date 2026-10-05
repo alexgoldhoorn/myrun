@@ -35,8 +35,12 @@ def test_units_and_derived_columns(cfg):
 
 
 def test_surface_classes(cfg):
+    import dataclasses
+
     df = activities(cfg=cfg)
-    assert _row(df, HILLY)["surface"] == "mixed"
+    assert _row(df, HILLY)["surface"] == "road"          # the sport type decides by default
+    hilly = dataclasses.replace(cfg, mixed_hilliness_m_per_km=15.0)
+    assert _row(activities(cfg=hilly), HILLY)["surface"] == "mixed"
     assert _row(df, TRAIL)["surface"] == "trail"
     assert _row(df, GYM)["surface"] is None
 

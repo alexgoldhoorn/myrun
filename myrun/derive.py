@@ -11,12 +11,17 @@ def hilliness(elevation_m: pd.Series, distance_km: pd.Series) -> pd.Series:
     return (elevation_m / distance_km).where(distance_km > 0)
 
 
-def surface(sport: pd.Series, hilliness_m_km: pd.Series, mixed_threshold: float) -> pd.Series:
-    """road / mixed / trail for running sports, None for everything else."""
+def surface(sport: pd.Series, hilliness_m_km: pd.Series,
+            mixed_threshold: float | None) -> pd.Series:
+    """road / trail from the sport type, None for non-running sports.
+
+    With a threshold, a Run that climbs at least that many metres per km is "mixed".
+    """
     out = pd.Series([None] * len(sport), index=sport.index, dtype="object")
     run = sport == "Run"
     out[run] = "road"
-    out[run & (hilliness_m_km >= mixed_threshold)] = "mixed"
+    if mixed_threshold is not None:
+        out[run & (hilliness_m_km >= mixed_threshold)] = "mixed"
     out[sport == "TrailRun"] = "trail"
     return out
 
