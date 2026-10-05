@@ -1,0 +1,81 @@
+"""activities() and runs(): one row per activity."""
+
+from __future__ import annotations
+
+from contextlib import closing
+
+import pandas as pd
+
+from myrun import derive
+from myrun.config import RUN_SPORTS, Config, load_config
+from myrun.stravadb import open_db
+
+# Strava reports cadence for these as one leg per minute.
+CADENCE_DOUBLED = ("Run", "TrailRun", "Walk", "Hike")
+
+_SQL = """
+SELECT activityId AS activity_id,
+       startDateTime AS start,
+       sportType AS sport,
+       name,
+       distance AS distance_m,
+       elevation AS elevation_m,
+       averageSpeed AS speed_kmh,
+       averageHeartRate AS avg_hr,
+       maxHeartRate AS max_hr,
+       averageCadence AS cadence,
+       movingTimeInSeconds AS moving_s,
+       workoutType AS workout_type,
+       COALESCE(streamsAreImported, 0) AS has_streams,
+       CASE WHEN json_valid(data) THEN json_extract(data, '$.suffer_score') END AS relative_effort,
+       CASE WHEN json_valid(weather) THEN json_extract(weather, '$.temperature_2m') END AS temp_c,
+       CASE WHEN json_valid(weather) THEN json_extract(weather, '$.apparent_temperature') END
+            AS feels_like_c,
+       CASE WHEN json_valid(weather) THEN json_extract(weather, '$.relativehumidity_2m') END
+            AS humidity_pct,
+       CASE WHEN json_valid(weather) THEN json_extract(weather, '$.dewpoint_2m') END AS dew_point_c
+FROM Activity
+WHERE COALESCE(markedForDeletion, 0) != 1
+ORDER BY startDateTime
+"""
+
+_NUMERIC = ("distance_m", "elevation_m", "speed_kmh", "avg_hr", "max_hr", "cadence", "moving_s",
+            "relative_effort", "temp_c", "feels_like_c", "humidity_pct", "dew_point_c")
+
+
+def activities(sports=None, since=None, *, cfg: Config | None = None) -> pd.DataFrame:
+    """One row per activity of any sport, oldest first."""
+    cfg = cfg or load_config()
+    with closing(open_db(cfg)) as conn:
+        df = pd.read_sql_query(_SQL, conn)
+
+    for column in _NUMERIC:
+        df[column] = pd.to_numeric(df[column], errors="coerce").astype("float64")
+    df["start"] = pd.to_datetime(df["start"])
+    df["date"] = df["start"].dt.normalize()
+    df["hour"] = df["start"].dt.hour + df["start"].dt.minute / 60
+    df["year"] = df["start"].dt.year
+    df["has_streams"] = df["has_streams"].astype(bool)
+
+    df["distance_km"] = df.pop("distance_m") / 1000
+    df["duration_min"] = df.pop("moving_s") / 60
+    has_distance = df["distance_km"] > 0
+    df["pace_min_km"] = (df["duration_min"] / df["distance_km"]).where(has_distance)
+    df["speed_kmh"] = df["speed_kmh"].where(has_distance)
+    cadence = df.pop("cadence")
+    df["cadence_spm"] = cadence.where(~df["sport"].isin(CADENCE_DOUBLED), cadence * 2)
+
+    df["hilliness_m_km"] = derive.hilliness(df["elevation_m"], df["distance_km"])
+    df["surface"] = derive.surface(df["sport"], df["hilliness_m_km"], cfg.mixed_hilliness_m_per_km)
+    df["session_type"] = None
+
+    if sports is not None:
+        df = df[df["sport"].isin(list(sports))]
+    if since is not None:
+        df = df[df["date"] >= pd.Timestamp(since).normalize()]
+    return df.reset_index(drop=True)
+
+
+def runs(since=None, *, cfg: Config | None = None) -> pd.DataFrame:
+    """activities() restricted to running sports."""
+    return activities(RUN_SPORTS, since, cfg=cfg)
