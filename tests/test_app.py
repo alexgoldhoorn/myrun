@@ -11,7 +11,7 @@ from tests.fixture import (RACE_COLUMNS, build_fixture, write_garmin, write_plan
                            write_wellness)
 
 ROOT = Path(__file__).resolve().parents[1]
-PAGES = ["Now.py", "pages/1_Trends.py"]
+PAGES = ["Now.py", "pages/1_Trends.py", "pages/2_Activity.py"]
 
 
 def write_config(tmp_path, db, **inputs) -> Path:
@@ -136,3 +136,19 @@ def test_trends_page_hides_optional_sections(baseline):
     text = _text(run_page("pages/1_Trends.py"))
     assert "Aerobic efficiency" in text
     assert "Races" not in text and "Wellness" not in text
+
+
+def test_activity_page_shows_the_newest_activity_with_streams(baseline):
+    at = run_page("pages/2_Activity.py")
+    text = _text(at)
+    assert "HR drift" in text and "Time in HR zones" in text and "Laps" in text
+    assert any("strava.com/activities/1" in str(b.url) for b in at.get("link_button"))
+
+
+def test_activity_page_handles_an_activity_without_stream_data(baseline):
+    at = run_page("pages/2_Activity.py")
+    options = at.selectbox[0].options
+    target = next(o for o in options if "5.0 km" in o)        # the run with no stream rows
+    at.selectbox[0].select(target).run()
+    assert not at.exception
+    assert "no stream data" in _text(at)
