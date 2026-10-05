@@ -44,3 +44,9 @@ def test_aerobic_efficiency(cfg):
     assert eff.loc[pd.Timestamp("2026-08-01"), "efficiency"] == pytest.approx(200 / 140)
     assert eff.loc[pd.Timestamp("2026-10-01"), "efficiency"] == pytest.approx(180 / 144)
     assert eff["n_runs"].tolist() == [1, 1]
+
+
+def test_best_efforts_ignore_other_sports(cfg):
+    ten = trends.best_efforts(cfg=cfg).query("distance_m == 10000")
+    assert ten["time_s"].tolist() == [2700]          # the 1100 s ride effort is not a run
+    assert ten["is_record"].tolist() == [True]

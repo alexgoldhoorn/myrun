@@ -63,7 +63,6 @@ else:
 races, race_state = optional.read_races(cfg)
 if race_state.status != "off":
     st.subheader("Races")
-    common.notice(race_state)
     if races is not None:
         if "type" in races:
             kinds = st.multiselect("Type", sorted(races["type"].dropna().unique()))

@@ -26,7 +26,6 @@ if acts.empty:
 plan, plan_state = optional.read_plan(cfg)
 if plan_state.status != "off":
     st.subheader("Next race")
-    common.notice(plan_state)
     upcoming = plan[(plan["type"] == "race") & (plan["date"] >= today)] if plan is not None else None
     if upcoming is not None and len(upcoming):
         race = upcoming.iloc[0]

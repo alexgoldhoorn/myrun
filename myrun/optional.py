@@ -8,6 +8,7 @@ what to show from the state; nothing here raises for a bad file.
 from __future__ import annotations
 
 import time
+import warnings
 from dataclasses import asdict, dataclass
 from datetime import date
 from pathlib import Path
@@ -44,6 +45,11 @@ def _age_hours(path: Path, now: float | None) -> float:
     return ((now if now is not None else time.time()) - path.stat().st_mtime) / 3600
 
 
+def _naive(values: pd.Series) -> pd.Series:
+    """Drop a timezone, keeping the wall-clock time the file states."""
+    return values.dt.tz_localize(None) if values.dt.tz is not None else values
+
+
 def _off(name: str) -> tuple[None, InputState]:
     return None, InputState(name, "off")
 
@@ -72,8 +78,19 @@ def read_wellness(cfg: Config, now: float | None = None):
         return _error(name, f"cannot read {path.name}: {exc}")
     if "date" not in df.columns:
         return _error(name, f"{path.name} has no 'date' column")
-    df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.normalize()
+    present = [c for c in WELLNESS_COLUMNS if c in df.columns]
+    if not present:
+        return _error(name, f"{path.name} has none of the expected columns: "
+                            f"{', '.join(WELLNESS_COLUMNS)}")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)  # pandas warns when no format is inferable
+        dates = pd.to_datetime(df["date"], errors="coerce")
+    df["date"] = _naive(dates).dt.normalize()
     df = df.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+    if df.empty:
+        return _error(name, f"{path.name} has no rows with a readable date")
+    for column in present:
+        df[column] = pd.to_numeric(df[column], errors="coerce").astype("float64")
     return df, _file_state(name, path, cfg, now)
 
 
@@ -156,8 +173,9 @@ def read_garmin_activities(cfg: Config, now: float | None = None):
     if "start" not in df.columns:
         return _error(name, f"{path.name} has no 'start' column")
     start = pd.to_datetime(df["start"], errors="coerce")
-    if getattr(start.dt, "tz", None) is not None:
-        start = start.dt.tz_localize(None)
+    if start.dt.tz is not None:
+        return _error(name, f"'start' in {path.name} carries a timezone; it must be the local "
+                            "wall-clock time without one, as Strava records it")
     df["start"] = start.astype("datetime64[ns]")
     df = df.dropna(subset=["start"]).sort_values("start").reset_index(drop=True)
     return df, _file_state(name, path, cfg, now)

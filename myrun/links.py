@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import math
+import pandas as pd
 
 
 def strava_url(activity_id: str) -> str:
@@ -14,8 +14,6 @@ def sfs_url(base: str | None, activity_id: str) -> str | None:
 
 
 def garmin_url(garmin_activity_id) -> str | None:
-    if garmin_activity_id is None:
-        return None
-    if isinstance(garmin_activity_id, float) and math.isnan(garmin_activity_id):
+    if garmin_activity_id is None or pd.isna(garmin_activity_id):
         return None
     return f"https://connect.garmin.com/modern/activity/{int(garmin_activity_id)}"

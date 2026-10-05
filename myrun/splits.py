@@ -79,8 +79,8 @@ def _write_cache(cfg: Config, cache: pd.DataFrame) -> None:
 
 def _metrics(cfg: Config, rows: pd.DataFrame, with_streams: set[str]) -> pd.DataFrame:
     cache = _read_cache(cfg)
-    todo = [a for a in rows["activity_id"].unique()
-            if a in with_streams and a not in set(cache["activity_id"])]
+    cached = set(cache["activity_id"])
+    todo = [a for a in rows["activity_id"].unique() if a in with_streams and a not in cached]
     if not todo:
         return cache
     fresh = []

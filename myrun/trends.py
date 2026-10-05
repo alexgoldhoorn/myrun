@@ -7,7 +7,7 @@ from contextlib import closing
 import pandas as pd
 
 from myrun.activities import activities as _load
-from myrun.config import Config, load_config
+from myrun.config import RUN_SPORTS, Config, load_config
 from myrun.stravadb import open_db
 
 _FREQ = {"week": "W-SUN", "month": "M", "year": "Y"}
@@ -44,17 +44,19 @@ def year_over_year(activities: pd.DataFrame) -> pd.DataFrame:
 
 
 def best_efforts(distances=(1000, 5000, 10000, 21097), *, cfg: Config | None = None) -> pd.DataFrame:
-    """Every recorded best effort at the given distances; is_record marks a new all-time best."""
+    """Every recorded running best effort at the given distances; is_record marks a new all-time best."""
     cfg = cfg or load_config()
     marks = ",".join("?" for _ in distances)
+    sports = ",".join("?" for _ in RUN_SPORTS)
     with closing(open_db(cfg)) as conn:
         df = pd.read_sql_query(
             f"""SELECT b.activityId AS activity_id, a.startDateTime AS start,
                        b.distanceInMeter AS distance_m, b.timeInSeconds AS time_s
                 FROM ActivityBestEffort b JOIN Activity a ON a.activityId = b.activityId
                 WHERE COALESCE(a.markedForDeletion, 0) != 1 AND b.distanceInMeter IN ({marks})
+                  AND b.sportType IN ({sports})
                 ORDER BY a.startDateTime""",
-            conn, params=[int(d) for d in distances],
+            conn, params=[*(int(d) for d in distances), *RUN_SPORTS],
         )
     df["date"] = pd.to_datetime(df.pop("start")).dt.normalize()
     df["pace_min_km"] = df["time_s"] / 60 / (df["distance_m"] / 1000)

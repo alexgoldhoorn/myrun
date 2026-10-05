@@ -156,3 +156,43 @@ def test_strava_db_goes_stale(cfg):
     _age(cfg.strava_db, 40)
     state = optional.input_states(cfg, today=TODAY)["strava_db"]
     assert state.status == "stale" and "40" in state.message
+
+
+def _wellness_file(tmp_path, frame):
+    path = tmp_path / "custom.parquet"
+    frame.to_parquet(path)
+    return path
+
+
+def test_wellness_with_no_readable_dates_is_an_error(cfg, tmp_path):
+    path = _wellness_file(tmp_path, pd.DataFrame({"date": ["soon", "later"], "readiness": [70, 71]}))
+    df, state = optional.read_wellness(with_inputs(cfg, wellness_parquet=path))
+    assert df is None and state.status == "error" and "date" in state.message
+
+
+def test_wellness_without_any_known_metric_is_an_error_naming_them(cfg, tmp_path):
+    path = _wellness_file(tmp_path, pd.DataFrame({"date": ["2026-10-01"], "body_battery": [80]}))
+    df, state = optional.read_wellness(with_inputs(cfg, wellness_parquet=path))
+    assert df is None and state.status == "error"
+    assert "readiness" in state.message and "hrv_ms" in state.message
+
+
+def test_wellness_is_normalised(cfg, tmp_path):
+    frame = pd.DataFrame({
+        "date": pd.to_datetime(["2026-10-01 22:00", "2026-10-02 22:00"]).tz_localize("Europe/Madrid"),
+        "readiness": ["70", "n/a"],
+    })
+    df, state = optional.read_wellness(with_inputs(cfg, wellness_parquet=_wellness_file(tmp_path, frame)))
+    assert state.status == "ok"
+    assert df["date"].tolist() == list(pd.to_datetime(["2026-10-01", "2026-10-02"]))
+    assert df["date"].dt.tz is None
+    assert df["readiness"].iloc[0] == 70.0 and pd.isna(df["readiness"].iloc[1])
+    assert df["readiness"].mean() == 70.0
+
+
+def test_garmin_start_with_a_timezone_is_an_error(cfg, tmp_path):
+    path = tmp_path / "tz.parquet"
+    pd.DataFrame({"start": pd.to_datetime(["2026-10-04 05:30"]).tz_localize("UTC"),
+                  "garmin_activity_id": [1]}).to_parquet(path)
+    df, state = optional.read_garmin_activities(with_inputs(cfg, garmin_activities_parquet=path))
+    assert df is None and state.status == "error" and "timezone" in state.message

@@ -63,10 +63,17 @@ def notice(state: InputState) -> bool:
     return state.status == "ok"
 
 
+# These inputs shape activities() itself (session types, surfaces, Garmin columns), so
+# every page consumes them and every page must say when one is stale or broken.
+FEEDS_ACTIVITIES = ("plan", "race_log", "garmin_activities")
+
+
 def banner(states: dict[str, InputState]) -> None:
     strava = states["strava_db"]
     if strava.status != "ok":
         st.error(f"**Activities may be out of date**: {strava.message}")
+    for name in FEEDS_ACTIVITIES:
+        notice(states[name])
 
 
 def footer(acts: pd.DataFrame, states: dict[str, InputState]) -> None:

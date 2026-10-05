@@ -143,6 +143,7 @@ def build_fixture(path: Path, today: date = TODAY, empty: bool = False) -> Path:
     efforts = [(STEADY, 1000, 333), (STEADY, 5000, 1667), (RACE, 1000, 250), (RACE, 5000, 1330),
                (RACE, 10000, 2700), (OLD, 5000, 1500)]
     conn.executemany("INSERT INTO ActivityBestEffort VALUES (?,?,'Run',?)", efforts)
+    conn.execute("INSERT INTO ActivityBestEffort VALUES (?, 10000, 'Ride', 1100)", (OLD,))
     conn.commit()
     conn.close()
     return path

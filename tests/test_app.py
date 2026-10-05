@@ -99,6 +99,44 @@ def test_renders_with_an_empty_database(empty_db, page):
 def test_broken_optional_inputs_show_notices_not_exceptions(broken_inputs, page):
     at = run_page(page)
     assert not at.exception
+    warnings = "\n".join(str(w.value) for w in at.warning)
+    assert "plan" in warnings and "garmin_activities" in warnings
+
+
+@pytest.mark.parametrize("page", PAGES)
+def test_stale_database_shows_a_banner(baseline, page, tmp_path):
+    import os
+    import time
+
+    old = time.time() - 40 * 3600
+    os.utime(tmp_path / "strava.db", (old, old))
+    at = run_page(page)
+    assert not at.exception
+    assert any("out of date" in str(e.value) for e in at.error)
+
+
+@pytest.mark.parametrize("page", PAGES)
+def test_stale_garmin_file_is_named_on_every_page(everything, page, tmp_path):
+    import os
+    import time
+
+    old = time.time() - 200 * 3600
+    os.utime(tmp_path / "g.parquet", (old, old))
+    at = run_page(page)
+    assert not at.exception
+    assert any("garmin_activities" in str(w.value) and "200" in str(w.value) for w in at.warning)
+
+
+def test_stale_wellness_hides_recovery_values(everything, tmp_path):
+    import os
+    import time
+
+    old = time.time() - 50 * 3600
+    os.utime(tmp_path / "w.parquet", (old, old))
+    at = run_page("Now.py")
+    assert not at.exception
+    assert any("wellness" in str(w.value) for w in at.warning)
+    assert "Values for" not in _text(at)
 
 
 def test_missing_database_is_one_clear_error(tmp_path, monkeypatch):
