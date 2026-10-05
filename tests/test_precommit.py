@@ -12,7 +12,7 @@ def test_forbidden_files():
 
 
 def test_scan_text_reports_line_and_pattern_numbers_only():
-    patterns = [re.compile("secret-town", re.I), re.compile(r"192\.168\.")]
+    patterns = [re.compile("secret-town", re.I), re.compile(r"10\.0\.")]
     text = "fine\nlives in Secret-Town\nhost 10.0.0.5\n"
     assert precommit.scan_text(text, patterns) == [(2, 1), (3, 2)]
     assert precommit.scan_text("nothing here\n", patterns) == []
