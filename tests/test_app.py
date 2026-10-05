@@ -11,7 +11,7 @@ from tests.fixture import (RACE_COLUMNS, build_fixture, write_garmin, write_plan
                            write_wellness)
 
 ROOT = Path(__file__).resolve().parents[1]
-PAGES = ["Now.py"]
+PAGES = ["Now.py", "pages/1_Trends.py"]
 
 
 def write_config(tmp_path, db, **inputs) -> Path:
@@ -124,3 +124,15 @@ def test_now_page_names_a_broken_input(broken_inputs):
     at = run_page("Now.py")
     warnings = "\n".join(str(w.value) for w in at.warning)
     assert "wellness" in warnings and "plan" in warnings
+
+
+def test_trends_page_content(everything):
+    text = _text(run_page("pages/1_Trends.py"))
+    for heading in ("Aerobic efficiency", "Volume", "Best efforts", "Races", "Wellness"):
+        assert heading in text
+
+
+def test_trends_page_hides_optional_sections(baseline):
+    text = _text(run_page("pages/1_Trends.py"))
+    assert "Aerobic efficiency" in text
+    assert "Races" not in text and "Wellness" not in text
