@@ -213,3 +213,9 @@ def test_explore_page_offers_dynamics_with_the_garmin_input(everything):
 def test_pages_say_where_the_hr_zones_come_from(baseline):
     assert "observed" in _text(run_page("pages/2_Activity.py"))
     assert "observed" in _text(run_page("pages/1_Trends.py"))
+
+
+def test_activity_page_shows_pace_as_minutes_and_seconds(baseline):
+    at = run_page("pages/2_Activity.py")
+    paces = [m.value for m in at.metric if m.label == "Pace"]
+    assert paces == ["5:33 /km"]                          # 40 min over 7.2 km

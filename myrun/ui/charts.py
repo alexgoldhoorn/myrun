@@ -7,7 +7,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from myrun import explore
+from myrun import explore, fmt
 
 
 def load_bars(weekly: pd.DataFrame) -> go.Figure:
@@ -50,14 +50,23 @@ def stream_figure(streams_df: pd.DataFrame, x: str = "time",
         xs = _x(series, x)
         for row, (column, _) in enumerate(metrics, start=1):
             ys = pd.to_numeric(series[column], errors="coerce")
+            extra = {}
             if column == "pace_min_km":
                 ys = ys.rolling(PACE_SMOOTHING_SAMPLES, min_periods=1, center=True).median()
+                extra = dict(text=[fmt.pace(v) for v in ys],
+                             hovertemplate="%{text} /km<extra>" + name + "</extra>")
             fig.add_trace(go.Scatter(x=list(xs), y=list(ys), mode="lines", name=name,
                                      legendgroup=name, showlegend=row == 1,
-                                     line=dict(dash=dash)), row=row, col=1)
+                                     line=dict(dash=dash), **extra), row=row, col=1)
     for row, (column, label) in enumerate(metrics, start=1):
         fig.update_yaxes(title_text=label, row=row, col=1,
                          autorange="reversed" if column == "pace_min_km" else None)
+        if column == "pace_min_km":
+            shown = pd.to_numeric(streams_df[column], errors="coerce").rolling(
+                PACE_SMOOTHING_SAMPLES, min_periods=1, center=True).median()
+            vals, text = fmt.pace_ticks(shown)
+            if vals:
+                fig.update_yaxes(tickmode="array", tickvals=vals, ticktext=text, row=row, col=1)
     fig.update_xaxes(title_text="Distance (km)" if x == "distance" else "Time (min)",
                      row=len(metrics), col=1)
     fig.update_layout(height=200 * len(metrics) + 60, margin=dict(l=10, r=10, t=10, b=10),
@@ -103,4 +112,9 @@ def explore_figure(df: pd.DataFrame, x: str, y: str, group: pd.Series | None = N
                                          hoverinfo="skip"))
     fig.update_layout(height=520, margin=dict(l=10, r=10, t=10, b=10), xaxis_title=x,
                       yaxis_title=y, showlegend=group is not None)
+    for column, update in ((x, fig.update_xaxes), (y, fig.update_yaxes)):
+        if column in fmt.PACE_COLUMNS:
+            vals, text = fmt.pace_ticks(df[column])
+            if vals:
+                update(tickmode="array", tickvals=vals, ticktext=text)
     return fig

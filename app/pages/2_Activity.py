@@ -3,7 +3,7 @@
 import pandas as pd
 import streamlit as st
 
-from myrun import links, optional, streams
+from myrun import fmt, links, optional, streams
 from myrun.hr import hr_settings
 from myrun.ui import charts, common
 
@@ -41,7 +41,7 @@ def _fmt(value, pattern):
 for slot, (label, text) in zip(st.columns(5), [
     ("Distance", _fmt(row["distance_km"], "{:.2f} km")),
     ("Time", _fmt(row["duration_min"], "{:.0f} min")),
-    ("Pace", _fmt(row["pace_min_km"], "{:.2f} min/km")),
+    ("Pace", "n/a" if pd.isna(row["pace_min_km"]) else f"{fmt.pace(row['pace_min_km'])} /km"),
     ("Avg HR", _fmt(row["avg_hr"], "{:.0f} bpm")),
     ("Climb", _fmt(row["elevation_m"], "{:.0f} m")),
 ]):
@@ -94,6 +94,10 @@ laps = streams.activity_laps(activity_id, cfg=cfg)
 if laps.empty:
     st.caption("No laps recorded.")
 else:
-    st.dataframe(laps.round({"distance_km": 2, "pace_min_km": 2}), hide_index=True)
+    shown = laps.round({"distance_km": 2})
+    shown["pace"] = shown.pop("pace_min_km").map(fmt.pace)
+    shown["time"] = shown.pop("duration_s").map(fmt.duration)
+    st.dataframe(shown[["lap", "name", "distance_km", "time", "pace", "avg_hr", "elev_diff_m"]],
+                 hide_index=True)
 
 common.footer(acts, states)

@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from myrun import optional, trends
+from myrun import fmt, optional, trends
 from myrun.config import RUN_SPORTS
 from myrun.hr import hr_settings
 from myrun.ui import common
@@ -38,8 +38,9 @@ if heart.easy_band is None:
 elif efficiency.empty:
     st.info("No runs qualify. Set hr.easy_band in the config if the band above is not yours.")
 else:
-    st.plotly_chart(px.line(efficiency, x="month", y="efficiency", markers=True,
-                            hover_data=["n_runs", "median_pace_min_km"]))
+    shown = efficiency.assign(median_pace=efficiency["median_pace_min_km"].map(fmt.pace))
+    st.plotly_chart(px.line(shown, x="month", y="efficiency", markers=True,
+                            hover_data={"n_runs": True, "median_pace": True}))
 
 # ---- volume ---------------------------------------------------------------
 st.subheader("Volume")
@@ -60,11 +61,14 @@ if efforts.empty:
 else:
     distance = st.selectbox("Distance (m)", sorted(efforts["distance_m"].unique()))
     chosen = efforts[efforts["distance_m"] == distance].copy()
-    chosen["time_min"] = chosen["time_s"] / 60
+    chosen["time"] = chosen["time_s"].map(fmt.duration)
+    chosen["pace"] = chosen["pace_min_km"].map(fmt.pace)
     chosen["kind"] = chosen["is_record"].map({True: "record at the time", False: "other"})
-    figure = px.scatter(chosen, x="date", y="time_min", color="kind",
-                        hover_data=["pace_min_km"])
-    figure.update_yaxes(autorange="reversed", title="Time (min)")
+    figure = px.scatter(chosen, x="date", y="time_s", color="kind",
+                        hover_data={"time_s": False, "time": True, "pace": True})
+    vals, text = fmt.duration_ticks(chosen["time_s"])
+    figure.update_yaxes(autorange="reversed", title="Time",
+                        **(dict(tickmode="array", tickvals=vals, ticktext=text) if vals else {}))
     st.plotly_chart(figure)
 
 # ---- races ----------------------------------------------------------------

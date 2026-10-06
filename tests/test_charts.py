@@ -76,3 +76,22 @@ def test_explore_figure_box_for_a_category():
 def test_explore_figure_ignores_rows_with_missing_values():
     df = pd.DataFrame({"x": [1.0, 2.0, 3.0, None], "y": [1.0, None, 3.0, 4.0]})
     assert list(charts.explore_figure(df, "x", "y").data[0].x) == [1.0, 3.0]
+
+
+def test_pace_is_shown_as_minutes_and_seconds():
+    fig = charts.stream_figure(_streams())
+    pace = fig.data[1]                                   # hr, pace, altitude, cadence
+    assert pace.text[0] == "5:30"
+    assert "%{text}" in pace.hovertemplate
+    assert "5:30" in list(fig.layout.yaxis2.ticktext)
+    assert fig.layout.yaxis.ticktext is None             # the HR axis is left alone
+
+
+def test_explore_formats_a_pace_axis_and_nothing_else():
+    df = pd.DataFrame({"temp_c": [5.0, 10.0, 15.0, 20.0],
+                       "pace_min_km": [5.0, 5.25, 5.5, 6.0]})
+    fig = charts.explore_figure(df, "temp_c", "pace_min_km")
+    assert "5:30" in list(fig.layout.yaxis.ticktext)
+    assert fig.layout.xaxis.ticktext is None
+    flipped = charts.explore_figure(df, "pace_min_km", "temp_c")
+    assert "5:30" in list(flipped.layout.xaxis.ticktext)
