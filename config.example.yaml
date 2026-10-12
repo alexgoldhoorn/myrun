@@ -34,6 +34,10 @@ wellness_columns:                     # only if your file uses other names. fiel
   # sleep_seconds: sleep_s            # converted to sleep_hours
   # body_battery: body_battery_wake
   # stress: stress_avg
+  # sleep_score: sleep_score          # the next four are shown as detail on the
+  # deep_sleep_seconds: deep_sleep_s  #   Sleep and HRV cards
+  # rem_sleep_seconds: rem_sleep_s
+  # hrv_status: hrv_status
 
 links:
   statistics_for_strava_url: http://localhost:8080

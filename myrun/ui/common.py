@@ -11,7 +11,7 @@ import streamlit as st
 
 from myrun import dynamics, metrics, optional, streams, trends
 from myrun.activities import activities
-from myrun.config import Config, ConfigError, load_config
+from myrun.config import RUN_SPORTS, Config, ConfigError, load_config
 from myrun.hr import hr_settings
 from myrun.load import weekly_load
 from myrun.optional import InputState
@@ -76,6 +76,10 @@ def load_splits(cfg: Config) -> pd.DataFrame:
     return _splits(cfg, _key(cfg))
 
 
+def _runs_only(acts: pd.DataFrame) -> pd.DataFrame:
+    return acts[acts["sport"].isin(RUN_SPORTS)]
+
+
 # Every table and number a page shows, by name. Each takes the config and plain arguments,
 # so one cache covers them all and a rerun (a widget click, another visitor) computes nothing.
 COMPUTE = {
@@ -92,6 +96,11 @@ COMPUTE = {
     "efficiency": lambda cfg: trends.aerobic_efficiency(activities=load_activities(cfg), cfg=cfg),
     "volume": lambda cfg, by: trends.volume(by, activities=load_activities(cfg)),
     "best_efforts": lambda cfg: trends.best_efforts(cfg=cfg),
+    "shoes": lambda cfg: trends.shoes(cfg=cfg),
+    "training_days": lambda cfg, weeks: metrics.training_days(
+        weeks, activities=load_activities(cfg), cfg=cfg),
+    "race_readiness": lambda cfg: metrics.race_readiness(
+        _runs_only(load_activities(cfg)), optional.read_plan(cfg)[0], _today()),
     "vo2max_trend": lambda cfg: metrics.vo2max_trend(load_activities(cfg)),
     "intensity_weekly": lambda cfg, weeks: metrics.intensity_weekly(
         weeks, activities=load_activities(cfg), cfg=cfg),

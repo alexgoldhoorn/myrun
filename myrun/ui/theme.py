@@ -49,6 +49,13 @@ CSS = """
             border-radius: 0.5rem; padding: 0.7rem 1rem; margin-bottom: 1rem;
             display: flex; flex-wrap: wrap; gap: 0.4rem 1.5rem; align-items: baseline; }
 .mr-strip strong { color: var(--mr-text); }
+.mr-cal { display: grid; grid-template-rows: repeat(7, 14px); grid-auto-flow: column;
+          grid-auto-columns: 14px; gap: 3px; margin: 0.25rem 0 1rem 0; }
+.mr-day { border-radius: 3px; background: var(--mr-border); }
+.mr-day-1 { background: var(--mr-line); opacity: 0.35; }
+.mr-day-2 { background: var(--mr-line); opacity: 0.65; }
+.mr-day-3 { background: var(--mr-line); }
+.mr-day-future { background: transparent; border: 1px dashed var(--mr-border); }
 [data-testid="stMetric"] { background: var(--mr-surface); border: 1px solid var(--mr-border);
                            border-radius: 0.5rem; padding: 0.7rem 1rem; }
 [data-testid="stMetricValue"] { font-variant-numeric: tabular-nums; }

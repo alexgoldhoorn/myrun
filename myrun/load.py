@@ -36,20 +36,22 @@ def weekly_load(weeks: int = 12, *, activities: pd.DataFrame | None = None, toda
 
 
 def load_status(*, activities: pd.DataFrame | None = None, today=None,
-                cfg: Config | None = None) -> dict:
-    """Last 7 days against the weekly average of the last 28 days (which include them)."""
+                cfg: Config | None = None, column: str = "relative_effort") -> dict:
+    """Last 7 days against the weekly average of the last 28 days (which include them).
+
+    `column` is the per-activity load: Strava's relative effort, or `garmin_load`."""
     cfg = cfg or load_config()
     acts = activities if activities is not None else _load(cfg=cfg)
     now = _today(today)
     last28 = acts[(acts["date"] > now - pd.Timedelta(days=28)) & (acts["date"] <= now)]
     last7 = last28[last28["date"] > now - pd.Timedelta(days=7)]
-    sum7 = float(last7["relative_effort"].sum())
-    avg_week = float(last28["relative_effort"].sum()) / 4
+    sum7 = float(last7[column].sum())
+    avg_week = float(last28[column].sum()) / 4
     ratio = sum7 / avg_week if avg_week > 0 else None
     return {
         "last7": sum7,
         "avg_week_28": avg_week,
         "ratio": ratio,
         "label": derive.load_label(ratio, cfg.load_bands),
-        "n_missing": int(last28["relative_effort"].isna().sum()),
+        "n_missing": int(last28[column].isna().sum()),
     }

@@ -1,5 +1,6 @@
 """Trends: am I getting fitter?"""
 
+import pandas as pd
 import plotly.express as px
 import streamlit as st
 
@@ -114,6 +115,21 @@ if dynamic_columns:
             lambda: charts.trend_line(trend, "month", "value", dynamics.DYNAMICS[column][0]),
             column))
         st.caption("Monthly median on easy, flat road runs, from the first month with data.")
+
+# ---- shoes -----------------------------------------------------------------
+shoes = common.cached("shoes", cfg)
+if len(shoes):
+    st.subheader("Shoes")
+    limit = trends.SHOE_LIMIT_KM
+    table = pd.DataFrame({
+        "Shoe": shoes["name"], "km": shoes["km"].round(0), "Runs": shoes["runs"],
+        "Last used": shoes["last_used"].dt.strftime("%d %b %Y"),
+        "Status": ["retired" if retired else (f"over {limit:g} km" if km >= limit else "")
+                   for retired, km in zip(shoes["retired"], shoes["km"])],
+    })
+    st.dataframe(table, hide_index=True)
+    st.caption(f"Running distance per shoe from Strava gear. {limit:g} km is a common point "
+               "to start checking the midsole.")
 
 # ---- races ----------------------------------------------------------------
 races, race_state = common.cached("races", cfg)

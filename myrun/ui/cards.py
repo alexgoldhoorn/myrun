@@ -55,3 +55,39 @@ def strip_html(items: list[tuple[str, str]]) -> str:
     parts = "".join(f'<span><span class="mr-label">{escape(label)}</span> '
                     f'<strong>{escape(value)}</strong></span>' for label, value in items)
     return f'<div class="mr-strip">{parts}</div>'
+
+
+_DAY_LEVELS = (30, 60)       # minutes: under 30 is light, under 60 medium, the rest full
+
+
+def calendar_html(days) -> str:
+    """Training days as a grid, one column per week (Monday on top); '' without days.
+
+    `days` has `date` and `minutes`; NaN minutes mark days that have not happened yet."""
+    if len(days) == 0:
+        return ""
+    squares = []
+    for row in days.itertuples(index=False):
+        if row.minutes != row.minutes:                       # NaN: a future day
+            squares.append('<span class="mr-day mr-day-future"></span>')
+            continue
+        level = 0 if row.minutes <= 0 else 1 + sum(row.minutes >= edge for edge in _DAY_LEVELS)
+        text = "rest" if level == 0 else f"{row.minutes:.0f} min"
+        squares.append(f'<span class="mr-day mr-day-{level}" '
+                       f'title="{escape(f"{row.date:%a %d %b}: {text}")}"></span>')
+    return f'<div class="mr-cal">{"".join(squares)}</div>'
+
+
+def readiness_html(ready: dict | None) -> str:
+    """The race build-up strip; '' when there is no race ahead."""
+    if not ready:
+        return ""
+    weeks, when = ready["weeks"], ready["days_to_go"]
+    to_go = "today" if when == 0 else f"in {when} day" + ("" if when == 1 else "s")
+    items = [("Race build-up", f"{ready['race']}, {to_go}"),
+             (f"Last {weeks} weeks", f"{ready['km']:.0f} km, longest {ready['longest_km']:.0f} km")]
+    previous = ready.get("previous")
+    if previous:
+        items.append((f"Same point before {previous['name']} ({previous['date']:%b %Y})",
+                      f"{previous['km']:.0f} km, longest {previous['longest_km']:.0f} km"))
+    return strip_html(items)

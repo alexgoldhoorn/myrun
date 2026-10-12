@@ -34,11 +34,18 @@ if plan is not None:
         strip.append(("Next race", "none in the plan"))
 strip.append(("Newest activity", f"{acts['start'].max():%a %d %b %H:%M}"))
 st.markdown(cards.strip_html(strip), unsafe_allow_html=True)
+build_up = cards.readiness_html(common.cached("race_readiness", cfg))
+if build_up:
+    st.markdown(build_up, unsafe_allow_html=True)
 
 # ---- cards ----------------------------------------------------------------
 numbers = common.cached("headline", cfg)
 st.subheader("Volume")
 cards.card_row(numbers["volume"])
+st.subheader("Consistency")
+cards.card_row(numbers["consistency"])
+st.caption("Training days, last 12 weeks: one column per week, Monday on top; darker is longer.")
+st.markdown(cards.calendar_html(common.cached("training_days", cfg, 12)), unsafe_allow_html=True)
 st.subheader("Load and fitness")
 cards.card_row(numbers["fitness"])
 
@@ -51,12 +58,16 @@ if wellness_state.status != "off":
         st.caption(f"Values for {wellness['date'].iloc[-1]:%a %d %b}.")
 
 # ---- charts ---------------------------------------------------------------
-left, right = st.columns(2)
+left, middle, right = st.columns(3)
 with left:
     st.subheader("Weekly load")
     st.plotly_chart(common.figure("weekly_load", cfg,
                                   lambda: charts.load_bars(common.cached("weekly_load", cfg, 12))))
 with right:
+    st.subheader("Easy pace, 12 weeks")
+    st.plotly_chart(common.figure(
+        "easy_pace", cfg, lambda: charts.easy_pace_line(common.cached("weekly_runs", cfg, 12))))
+with middle:
     st.subheader("Weekly running km")
     st.plotly_chart(common.figure(
         "weekly_km", cfg, lambda: charts.weekly_km_bars(common.cached("weekly_runs", cfg, 12))))
