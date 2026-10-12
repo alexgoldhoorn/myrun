@@ -3,14 +3,13 @@
 import pandas as pd
 import streamlit as st
 
-from myrun import dynamics, fmt, links, optional, streams
+from myrun import dynamics, fmt, links, streams
 from myrun.config import RUN_SPORTS
-from myrun.hr import hr_settings
 from myrun.ui import cards, charts, common
 
 cfg = common.setup("Activity")
 acts = common.load_activities(cfg)
-states = optional.input_states(cfg)
+states = common.cached("input_states", cfg)
 
 common.banner(states)
 st.title("Activity")
@@ -67,7 +66,7 @@ if dynamic_cards:
     st.subheader("Running dynamics")
     cards.card_row(dynamic_cards)
 
-data = streams.activity_streams(activity_id, cfg=cfg)
+data = common.cached("streams", cfg, activity_id)
 if data.empty:
     st.info("This activity has no stream data.")
     common.footer(acts, states)
@@ -77,17 +76,22 @@ left, right = st.columns([1, 3])
 axis = left.radio("X axis", ["time", "distance"], horizontal=True)
 others = ["(none)"] + [label for label in options if label != choice]
 compare = right.selectbox("Compare with", others)
-overlay = None if compare == "(none)" else streams.activity_streams(by_label[compare], cfg=cfg)
-st.plotly_chart(charts.stream_figure(data, x=axis, overlay=overlay))
+overlay = None if compare == "(none)" else common.cached("streams", cfg, by_label[compare])
+st.plotly_chart(common.figure("streams", cfg,
+                              lambda: charts.stream_figure(data, x=axis, overlay=overlay),
+                              activity_id, axis, None if overlay is None else by_label[compare]))
 
 left, right = st.columns(2)
 with left:
     st.subheader("Time in HR zones")
-    heart = hr_settings(cfg, acts)
+    heart = common.cached("hr_settings", cfg)
     if heart.zone_upper_bounds is None:
         st.caption(f"Zones {heart.source}.")
     else:
-        st.plotly_chart(charts.zone_bar(streams.zone_seconds(data, heart.zone_upper_bounds)))
+        st.plotly_chart(common.figure(
+            "zones", cfg,
+            lambda: charts.zone_bar(streams.zone_seconds(data, heart.zone_upper_bounds)),
+            activity_id))
         edges = ", ".join(str(b) for b in heart.zone_upper_bounds)
         st.caption(f"Zones end at {edges} bpm; {heart.source}.")
 with right:
@@ -101,7 +105,7 @@ with right:
                    "A few percent is normal; much more points to heat, fatigue or pacing.")
 
 st.subheader("Laps")
-laps = streams.activity_laps(activity_id, cfg=cfg)
+laps = common.cached("laps", cfg, activity_id)
 if laps.empty:
     st.caption("No laps recorded.")
 else:
