@@ -11,11 +11,6 @@ def test_load_bars_has_one_bar_per_week():
     assert len(fig.data) == 1 and list(fig.data[0].y) == [135.0, 0.0]
 
 
-def test_sparkline_handles_empty_input():
-    assert len(charts.sparkline(pd.Series([50.0, 52.0, 49.0])).data) == 1
-    assert len(charts.sparkline(pd.Series([], dtype=float)).data) == 1
-
-
 def _streams(n=100, hr=140):
     return pd.DataFrame({
         "time_s": range(n), "distance_m": [3.0 * i for i in range(n)], "hr": [hr] * n,
@@ -95,3 +90,11 @@ def test_explore_formats_a_pace_axis_and_nothing_else():
     assert fig.layout.xaxis.ticktext is None
     flipped = charts.explore_figure(df, "pace_min_km", "temp_c")
     assert "5:30" in list(flipped.layout.xaxis.ticktext)
+
+
+def test_weekly_km_bars_adds_the_plan_only_when_there_is_one():
+    weekly = pd.DataFrame({"week_start": pd.to_datetime(["2026-09-28", "2026-10-05"]),
+                           "run_km": [17.2, 0.0], "planned_km": [float("nan"), float("nan")]})
+    assert len(charts.weekly_km_bars(weekly).data) == 1
+    weekly["planned_km"] = [20.0, 25.0]
+    assert [t.name for t in charts.weekly_km_bars(weekly).data] == ["done", "planned"]

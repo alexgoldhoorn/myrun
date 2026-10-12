@@ -19,13 +19,6 @@ def load_bars(weekly: pd.DataFrame) -> go.Figure:
     return fig
 
 
-def sparkline(values: pd.Series) -> go.Figure:
-    fig = go.Figure(go.Scatter(y=list(values), mode="lines", hoverinfo="skip"))
-    fig.update_layout(height=60, margin=dict(l=0, r=0, t=0, b=0), showlegend=False,
-                      xaxis=dict(visible=False), yaxis=dict(visible=False))
-    return fig
-
-
 _STREAM_METRICS = [("hr", "Heart rate (bpm)"), ("pace_min_km", "Pace (min/km)"),
                    ("altitude_m", "Elevation (m)"), ("cadence_spm", "Cadence (spm)")]
 PACE_SMOOTHING_SAMPLES = 15
@@ -127,4 +120,18 @@ def trend_line(df: pd.DataFrame, x: str, y: str, y_title: str) -> go.Figure:
                                hovertemplate="%{x|%b %Y}<br>%{y:.1f}<extra></extra>"))
     theme.style(fig, height=300)
     fig.update_layout(yaxis_title=y_title, xaxis_title=None)
+    return fig
+
+
+def weekly_km_bars(weekly: pd.DataFrame) -> go.Figure:
+    """Running km per week, with the planned km as markers where a plan covers the week."""
+    fig = go.Figure(go.Bar(x=weekly["week_start"], y=weekly["run_km"], name="done",
+                           hovertemplate="week of %{x|%d %b}<br>%{y:.1f} km<extra></extra>"))
+    if "planned_km" in weekly and weekly["planned_km"].notna().any():
+        fig.add_trace(go.Scatter(x=weekly["week_start"], y=weekly["planned_km"], name="planned",
+                                 mode="markers", marker={"symbol": "line-ew-open", "size": 22,
+                                                         "line": {"width": 2}},
+                                 hovertemplate="planned %{y:.1f} km<extra></extra>"))
+    theme.style(fig, height=260)
+    fig.update_layout(yaxis_title="Running km", xaxis_title=None)
     return fig

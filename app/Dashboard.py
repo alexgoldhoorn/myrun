@@ -1,0 +1,107 @@
+"""Dashboard: how am I doing right now?"""
+
+import datetime as dt
+
+import pandas as pd
+import streamlit as st
+
+from myrun import links, metrics, optional
+from myrun.load import weekly_load
+from myrun.planmatch import plan_vs_actual
+from myrun.ui import cards, charts, common
+
+cfg = common.setup("Dashboard")
+acts = common.load_activities(cfg)
+states = optional.input_states(cfg)
+today = pd.Timestamp(dt.date.today())
+
+common.banner(states)
+st.title("Dashboard")
+if acts.empty:
+    st.info("No activities in the database yet.")
+    common.footer(acts, states)
+    st.stop()
+
+# ---- header strip ---------------------------------------------------------
+plan, plan_state = optional.read_plan(cfg)
+strip = []
+if plan is not None:
+    upcoming = plan[(plan["type"] == "race") & (plan["date"] >= today)]
+    if len(upcoming):
+        race = upcoming.iloc[0]
+        days = (race["date"] - today).days
+        when = "today" if days == 0 else f"in {days} day" + ("" if days == 1 else "s")
+        strip.append(("Next race", f"{race['session']}, {race['date']:%a %d %b}, {when}"))
+    else:
+        strip.append(("Next race", "none in the plan"))
+strip.append(("Newest activity", f"{acts['start'].max():%a %d %b %H:%M}"))
+st.markdown(cards.strip_html(strip), unsafe_allow_html=True)
+
+# ---- cards ----------------------------------------------------------------
+numbers = metrics.headline(activities=acts, cfg=cfg)
+st.subheader("Volume")
+cards.card_row(numbers["volume"])
+st.subheader("Load and fitness")
+cards.card_row(numbers["fitness"])
+
+wellness, wellness_state = optional.read_wellness(cfg)
+if wellness_state.status != "off":
+    st.subheader("Recovery")
+    usable = common.notice(wellness_state)
+    cards.card_row(numbers["recovery"])
+    if usable and any(card.value is not None for card in numbers["recovery"]):
+        st.caption(f"Values for {wellness['date'].iloc[-1]:%a %d %b}.")
+
+# ---- charts ---------------------------------------------------------------
+left, right = st.columns(2)
+with left:
+    st.subheader("Weekly load")
+    st.plotly_chart(charts.load_bars(weekly_load(12, activities=acts, cfg=cfg)))
+with right:
+    st.subheader("Weekly running km")
+    st.plotly_chart(charts.weekly_km_bars(metrics.weekly_runs(12, activities=acts, cfg=cfg)))
+
+# ---- this week ------------------------------------------------------------
+st.subheader("This week")
+week = plan_vs_actual(activities=acts, cfg=cfg)
+table = pd.DataFrame({"Day": week["date"].dt.strftime("%a %d %b"), "Done": week["actual"]})
+if plan is not None:
+    table.insert(1, "Planned", week["planned"])
+st.dataframe(table, hide_index=True)
+run_km = week["actual_run_km"].sum()
+if plan is not None and week["planned_km"].notna().any():
+    st.caption(f"Running: {run_km:.1f} km done of {week['planned_km'].sum():.1f} km planned.")
+else:
+    st.caption(f"Running: {run_km:.1f} km so far this week.")
+
+# ---- recent runs ----------------------------------------------------------
+st.subheader("Recent runs")
+recent = acts[acts["date"] > today - pd.Timedelta(days=7)].sort_values("start", ascending=False)
+if recent.empty:
+    st.caption("No activities in the last 7 days.")
+else:
+    listing = pd.DataFrame({
+        "When": recent["start"].dt.strftime("%a %d %b %H:%M"),
+        "Sport": recent["sport"],
+        "Session": recent["session_name"] if "session_name" in recent else None,
+        "km": recent["distance_km"].round(1),
+        "min": recent["duration_min"].round(0),
+        "Avg HR": recent["avg_hr"],
+        "Effort": recent["relative_effort"],
+        "Strava": recent["activity_id"].map(links.strava_url),
+        "Garmin": recent["garmin_activity_id"].map(links.garmin_url)
+        if "garmin_activity_id" in recent else None,
+        "Stats": recent["activity_id"].map(lambda a: links.sfs_url(cfg.sfs_url, a)),
+    })
+    listing = listing.drop(columns=[c for c in ("Session", "Garmin", "Stats")
+                                    if listing[c].isna().all()])
+    link = st.column_config.LinkColumn(display_text="open")
+    picked = st.dataframe(listing, hide_index=True, on_select="rerun", selection_mode="single-row",
+                          column_config={"Strava": link, "Garmin": link, "Stats": link},
+                          key="recent")
+    if picked.selection.rows:
+        st.session_state["activity_id"] = recent["activity_id"].iloc[picked.selection.rows[0]]
+        st.switch_page("pages/2_Activity.py")
+    st.caption("Select a row to open it on the Activity page.")
+
+common.footer(acts, states)

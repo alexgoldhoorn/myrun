@@ -11,7 +11,7 @@ from tests.fixture import (RACE_COLUMNS, build_fixture, write_garmin_csv, write_
                            write_wellness)
 
 ROOT = Path(__file__).resolve().parents[1]
-PAGES = ["Now.py", "pages/1_Trends.py", "pages/2_Activity.py", "pages/3_Explore.py"]
+PAGES = ["Dashboard.py", "pages/1_Trends.py", "pages/2_Activity.py", "pages/3_Explore.py"]
 
 
 def write_config(tmp_path, db, **inputs) -> Path:
@@ -133,7 +133,7 @@ def test_stale_wellness_hides_recovery_values(everything, tmp_path):
 
     old = time.time() - 50 * 3600
     os.utime(tmp_path / "w.parquet", (old, old))
-    at = run_page("Now.py")
+    at = run_page("Dashboard.py")
     assert not at.exception
     assert any("wellness" in str(w.value) for w in at.warning)
     assert "Values for" not in _text(at)
@@ -141,27 +141,35 @@ def test_stale_wellness_hides_recovery_values(everything, tmp_path):
 
 def test_missing_database_is_one_clear_error(tmp_path, monkeypatch):
     monkeypatch.setenv("MYRUN_CONFIG", str(write_config(tmp_path, tmp_path / "absent.db")))
-    at = run_page("Now.py")
+    at = run_page("Dashboard.py")
     assert not at.exception
     assert len(at.error) == 1 and "not found" in at.error[0].value
 
 
-def test_now_page_content_baseline(baseline):
-    text = _text(run_page("Now.py"))
-    assert "Load" in text and "Last 7 days" in text
+def test_dashboard_content_baseline(baseline):
+    text = _text(run_page("Dashboard.py"))
+    for label in ("This week", "Last 4 weeks", "Year to date", "Load, 7 days vs 4 weeks",
+                  "Easy pace", "Longest run, 4 weeks", "Runs per week", "Recent runs"):
+        assert label in text
     assert "Next race" not in text and "Recovery" not in text       # hidden, not configured
 
 
-def test_now_page_content_with_inputs(everything):
-    text = _text(run_page("Now.py"))
+def test_dashboard_content_with_inputs(everything):
+    text = _text(run_page("Dashboard.py"))
     assert "Next race" in text and "Trail Race 23km" in text
-    assert "Recovery" in text
+    assert "Recovery" in text and "Readiness" in text and "Values for" in text
+    assert "connect.garmin.com" not in text                        # links live in the table
 
 
-def test_now_page_names_a_broken_input(broken_inputs):
-    at = run_page("Now.py")
+def test_dashboard_names_a_broken_input(broken_inputs):
+    at = run_page("Dashboard.py")
     warnings = "\n".join(str(w.value) for w in at.warning)
     assert "wellness" in warnings and "plan" in warnings
+
+
+def test_dashboard_opens_a_run_on_the_activity_page(baseline):
+    at = run_page("Dashboard.py")
+    assert not at.exception and len(at.dataframe) >= 2             # this week, recent runs
 
 
 def test_trends_page_content(everything):
@@ -224,7 +232,7 @@ def test_activity_page_shows_pace_as_minutes_and_seconds(baseline):
 def test_activity_page_shows_running_dynamics_with_the_feed(everything):
     at = run_page("pages/2_Activity.py")
     assert "Running dynamics" in _text(at)
-    assert any(m.label == "Ground contact" and m.value == "250 ms" for m in at.metric)
+    assert "Ground contact" in _text(at) and "250 ms" in _text(at)
     assert any("connect.garmin.com/modern/activity/111" in str(b.url)
                for b in at.get("link_button"))
 

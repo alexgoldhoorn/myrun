@@ -6,7 +6,7 @@ import streamlit as st
 from myrun import dynamics, fmt, links, optional, streams
 from myrun.config import RUN_SPORTS
 from myrun.hr import hr_settings
-from myrun.ui import charts, common
+from myrun.ui import cards, charts, common
 
 cfg = common.setup("Activity")
 acts = common.load_activities(cfg)
@@ -65,10 +65,7 @@ runs_only = acts[acts["sport"].isin(RUN_SPORTS)]
 dynamic_cards = dynamics.activity_dynamics(row, runs_only)
 if dynamic_cards:
     st.subheader("Running dynamics")
-    for slot, card in zip(st.columns(len(dynamic_cards)), dynamic_cards):
-        slot.metric(card.label, fmt.metric_value(card.value, card.unit),
-                    fmt.metric_delta(card.delta, card.unit) or None, delta_color="off",
-                    help=card.note)
+    cards.card_row(dynamic_cards)
 
 data = streams.activity_streams(activity_id, cfg=cfg)
 if data.empty:

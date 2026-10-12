@@ -5,11 +5,14 @@ A personal training dashboard that sits on top of a
 database. It answers four questions, and links out to Strava, Garmin Connect and
 statistics-for-strava for everything else.
 
-- **Now**: load in the last 7 days against your 4-week average, this week against
-  the plan, recovery, the next race.
-- **Trends**: aerobic efficiency, volume, best efforts, races.
+- **Dashboard**: cards for volume, load and fitness, and recovery, each against the
+  period before; weekly load and weekly kilometres against the plan; this week's
+  sessions; recent runs.
+- **Trends**: aerobic efficiency, volume, best efforts, races, and running dynamics
+  over time when the Garmin input is set.
 - **Activity**: heart rate, pace, elevation and cadence over one run, time in zones,
-  heart-rate drift, laps, and an overlay with another run.
+  heart-rate drift, laps, an overlay with another run, and the run's running dynamics
+  against your recent runs on the same surface.
 - **Explore**: any metric against any other, per run or per kilometre, grouped by
   hour of day, temperature, surface, climb or descent, and more.
 
@@ -38,7 +41,7 @@ share no identifier.
 ```bash
 uv sync
 cp config.example.yaml ~/my-myrun-config.yaml      # then edit strava_db and your HR zones
-MYRUN_CONFIG=~/my-myrun-config.yaml uv run streamlit run app/Now.py
+MYRUN_CONFIG=~/my-myrun-config.yaml uv run streamlit run app/Dashboard.py
 ```
 
 There is no login. Bind it to localhost or put it behind a reverse proxy that
