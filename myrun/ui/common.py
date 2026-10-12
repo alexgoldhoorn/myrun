@@ -34,7 +34,7 @@ def _mtime(path: Path | None) -> float:
 
 
 def _key(cfg: Config) -> tuple:
-    inputs = (cfg.plan_csv, cfg.race_log_csv, cfg.garmin_activities_parquet)
+    inputs = (cfg.plan_csv, cfg.race_log_csv, cfg.garmin_activities)
     return (repr(cfg), db_mtime(cfg.strava_db).timestamp(), tuple(_mtime(p) for p in inputs))
 
 

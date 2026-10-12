@@ -207,6 +207,26 @@ def write_garmin(path: Path, today: date = TODAY) -> Path:
             "ground_contact_ms": [250.0, 260.0],
             "vertical_oscillation_cm": [8.5, 9.0],
             "stride_length_m": [1.10, 1.05],
+            "vertical_ratio_pct": [8.8, 9.1],
+            "power_w": [340.0, None],
+            "garmin_cadence_spm": [170.0, 168.0],
+            "aerobic_te": [3.1, 2.0],
         }
     ).to_parquet(path)
+    return path
+
+
+def write_garmin_csv(path: Path, today: date = TODAY) -> Path:
+    """The same two rows as write_garmin, in the feed's CSV form, with a blank and junk."""
+    first = start_of(STEADY, today) + timedelta(seconds=30)
+    second = start_of(HILLY, today) + timedelta(minutes=10)
+    path.write_text(
+        "start,garmin_activity_id,sport,session_name,session_type,ground_contact_ms,"
+        "vertical_oscillation_cm,vertical_ratio_pct,stride_length_m,garmin_cadence_spm,"
+        "power_w,aerobic_te,anaerobic_te,garmin_load,vo2max\n"
+        f"{first:%Y-%m-%d %H:%M:%S},111,running,Tempo 7km,tempo,250.0,8.5,8.8,1.10,170.0,"
+        "340.0,3.1,0.0,60.0,\n"
+        f"{second:%Y-%m-%d %H:%M:%S},222,running,Somewhere else,,--,9.0,9.1,1.05,168.0,"
+        ",2.0,0.0,40.0,\n"
+    )
     return path

@@ -7,7 +7,7 @@ import pytest
 import yaml
 from streamlit.testing.v1 import AppTest
 
-from tests.fixture import (RACE_COLUMNS, build_fixture, write_garmin, write_plan, write_races,
+from tests.fixture import (RACE_COLUMNS, build_fixture, write_garmin_csv, write_plan, write_races,
                            write_wellness)
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -53,7 +53,7 @@ def everything(tmp_path, monkeypatch):
         wellness_parquet=write_wellness(tmp_path / "w.parquet", today),
         plan_csv=write_plan(tmp_path / "plan.csv", today),
         race_log_csv=write_races(tmp_path / "races.csv", today),
-        garmin_activities_parquet=write_garmin(tmp_path / "g.parquet", today),
+        garmin_activities=write_garmin_csv(tmp_path / "g.csv", today),
     )
     monkeypatch.setenv("MYRUN_CONFIG", str(config))
 
@@ -70,7 +70,7 @@ def broken_inputs(tmp_path, monkeypatch):
     junk = tmp_path / "junk.parquet"
     junk.write_bytes(b"nope")
     config = write_config(tmp_path, db, wellness_parquet=junk, plan_csv=tmp_path / "absent.csv",
-                          garmin_activities_parquet=junk)
+                          garmin_activities=junk)
     monkeypatch.setenv("MYRUN_CONFIG", str(config))
 
 
@@ -121,7 +121,7 @@ def test_stale_garmin_file_is_named_on_every_page(everything, page, tmp_path):
     import time
 
     old = time.time() - 200 * 3600
-    os.utime(tmp_path / "g.parquet", (old, old))
+    os.utime(tmp_path / "g.csv", (old, old))
     at = run_page(page)
     assert not at.exception
     assert any("garmin_activities" in str(w.value) and "200" in str(w.value) for w in at.warning)
