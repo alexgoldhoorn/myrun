@@ -5,7 +5,8 @@ strava_db: /path/to/statistics-for-strava/storage/database/strava.db
 cache_dir: ~/.cache/myrun            # derived data only; safe to delete
 
 inputs:                               # each is optional; leave out what you do not have
-  wellness_parquet:                   # columns: date, readiness, sleep_hours, hrv_ms, resting_hr
+  wellness_parquet:                   # columns: date, readiness, sleep_hours, hrv_ms, resting_hr,
+                                      #   body_battery, stress
   plan_csv:                           # columns: date, session, type, distance_km
   race_log_csv:                       # your own columns, mapped below
   garmin_activities:                  # .csv or .parquet. Required column: start (local time).
@@ -31,6 +32,8 @@ wellness_columns:                     # only if your file uses other names. fiel
   # hrv_ms: hrv_last_night_ms
   # resting_hr: resting_hr
   # sleep_seconds: sleep_s            # converted to sleep_hours
+  # body_battery: body_battery_wake
+  # stress: stress_avg
 
 links:
   statistics_for_strava_url: http://localhost:8080

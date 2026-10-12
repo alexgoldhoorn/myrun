@@ -81,12 +81,13 @@ _VALUE_FORMATS = {
     "km": "{:.1f} km", "m": "{:,.0f} m", "metres": "{:.2f} m", "ratio": "{:.2f}",
     "count": "{:.1f}", "score": "{:.0f}", "ms": "{:.0f} ms", "bpm": "{:.0f} bpm",
     "hours": "{:.1f} h", "cm": "{:.1f} cm", "pct": "{:.1f} %", "w": "{:.0f} W", "te": "{:.1f}",
+    "share": "{:.0f} %",
 }
 _DELTA_FORMATS = {
     "km": "{:+.1f} km", "m": "{:+,.0f} m", "metres": "{:+.2f} m", "ratio": "{:+.2f}",
     "count": "{:+.1f}", "score": "{:+.0f}", "ms": "{:+.0f} ms", "bpm": "{:+.0f} bpm",
     "hours": "{:+.1f} h", "cm": "{:+.1f} cm", "pct": "{:+.1f} %", "w": "{:+.0f} W",
-    "te": "{:+.1f}",
+    "te": "{:+.1f}", "share": "{:+.0f} pts",
 }
 
 

@@ -24,7 +24,14 @@ _RECOVERY = {
     "hrv_ms": ("HRV", "ms", True),
     "resting_hr": ("Resting HR", "bpm", False),
     "sleep_hours": ("Sleep", "hours", True),
+    "body_battery": ("Body battery", "score", True),
+    "stress": ("Stress", "score", False),
 }
+VO2MAX_STEP = 1.0              # Garmin reports whole numbers: one point is a real change
+STEADY_AEROBIC_TE = 3.0        # Garmin training effect 3.0-3.9 "improving"
+HARD_AEROBIC_TE = 4.0          # 4.0 and up "highly improving"
+HARD_ANAEROBIC_TE = 2.0        # 2.0 and up: the session had real anaerobic work
+INTENSITIES = ("easy", "steady", "hard")
 
 
 def _now(today) -> pd.Timestamp:
@@ -87,6 +94,122 @@ def _series(values) -> tuple[float, ...]:
     return tuple(float(v) for v in values if clean(v) is not None)
 
 
+def vo2max_card(runs: pd.DataFrame, now: pd.Timestamp) -> Metric | None:
+    """Garmin's VO2max estimate: the newest value against the newest one from 4 weeks ago.
+
+    None when the activities carry no VO2max column at all (no Garmin input)."""
+    if "vo2max" not in runs.columns:
+        return None
+    known = runs.dropna(subset=["vo2max"]).sort_values("date")
+    recent = _last(known, now)
+    earlier = known[known["date"] <= now - pd.Timedelta(days=28)]
+    value = clean(recent["vo2max"].iloc[-1]) if len(recent) else None
+    previous = clean(earlier["vo2max"].iloc[-1]) if len(earlier) else None
+    tone = "neutral"
+    if value is not None and previous is not None and abs(value - previous) >= VO2MAX_STEP:
+        tone = "good" if value > previous else "bad"
+    return Metric("vo2max", "VO2max", value, previous, "score",
+                  _series(_last(known, now, days=7 * TREND_WEEKS)["vo2max"]), tone=tone,
+                  note="Garmin estimate, vs 4 weeks ago" if value is not None
+                  else "no VO2max value in the last 4 weeks")
+
+
+def intensity(runs: pd.DataFrame) -> pd.Series:
+    """easy, steady or hard per run from Garmin's training effect; None without one."""
+    aerobic = pd.to_numeric(runs["aerobic_te"], errors="coerce")
+    anaerobic = (pd.to_numeric(runs["anaerobic_te"], errors="coerce").fillna(0.0)
+                 if "anaerobic_te" in runs.columns else pd.Series(0.0, index=runs.index))
+    out = pd.Series("easy", index=runs.index, dtype="object")
+    out[aerobic >= STEADY_AEROBIC_TE] = "steady"
+    out[(aerobic >= HARD_AEROBIC_TE) | (anaerobic >= HARD_ANAEROBIC_TE)] = "hard"
+    out[aerobic.isna()] = None
+    return out
+
+
+def _shares(runs: pd.DataFrame) -> dict[str, float] | None:
+    kinds = intensity(runs)
+    minutes = runs["duration_min"].where(kinds.notna()).groupby(kinds).sum()
+    total = float(minutes.sum())
+    if total <= 0:
+        return None
+    return {kind: 100 * float(minutes.get(kind, 0.0)) / total for kind in INTENSITIES}
+
+
+def intensity_card(runs: pd.DataFrame, now: pd.Timestamp) -> Metric | None:
+    """Share of running time spent in easy sessions, last 4 weeks against the 4 before.
+
+    None when the activities carry no training effect at all (no Garmin input)."""
+    if "aerobic_te" not in runs.columns:
+        return None
+    recent, before = _shares(_last(runs, now)), _shares(_last(runs, now - pd.Timedelta(days=28)))
+    if recent is None:
+        return Metric("easy_share", "Easy share", None, None, "share",
+                      note="no runs with a training effect in the last 4 weeks")
+    return Metric("easy_share", "Easy share", recent["easy"],
+                  None if before is None else before["easy"], "share",
+                  note="of running time, vs previous 4 weeks",
+                  detail=f"{recent['steady']:.0f} % steady, {recent['hard']:.0f} % hard")
+
+
+def intensity_weekly(weeks: int = TREND_WEEKS, *, activities: pd.DataFrame | None = None,
+                     today=None, cfg: Config | None = None) -> pd.DataFrame:
+    """Running minutes per week (Monday start) in easy, steady and hard sessions."""
+    acts = activities if activities is not None else _load(cfg=cfg or load_config())
+    now = _now(today)
+    monday = now - pd.Timedelta(days=now.weekday())
+    all_weeks = pd.date_range(monday - pd.Timedelta(weeks=weeks - 1), periods=weeks, freq="7D")
+    columns = [f"{kind}_min" for kind in INTENSITIES]
+    runs = acts[acts["sport"].isin(RUN_SPORTS)]
+    runs = _between(runs, all_weeks[0], now)
+    if "aerobic_te" not in runs.columns or runs.empty:
+        out = pd.DataFrame(0.0, index=all_weeks, columns=columns)
+    else:
+        week = runs["date"] - pd.to_timedelta(runs["date"].dt.weekday, unit="D")
+        out = (runs.assign(week_start=week, kind=intensity(runs)).dropna(subset=["kind"])
+               .pivot_table(index="week_start", columns="kind", values="duration_min",
+                            aggfunc="sum", fill_value=0.0)
+               .reindex(index=all_weeks, columns=list(INTENSITIES), fill_value=0.0))
+        out.columns = columns
+    return out.astype("float64").rename_axis("week_start").reset_index()
+
+
+def vo2max_trend(activities: pd.DataFrame) -> pd.DataFrame:
+    """Monthly median of Garmin's VO2max estimate on runs, from the first month with data."""
+    empty = pd.DataFrame(columns=["month", "value", "n_runs"])
+    if "vo2max" not in activities.columns:
+        return empty
+    runs = activities[activities["sport"].isin(RUN_SPORTS)].dropna(subset=["vo2max"])
+    if runs.empty:
+        return empty
+    runs = runs.assign(month=runs["date"].dt.to_period("M").dt.start_time)
+    return runs.groupby("month", as_index=False).agg(value=("vo2max", "median"),
+                                                     n_runs=("activity_id", "count"))
+
+
+def adherence_card(runs: pd.DataFrame, plan: pd.DataFrame | None, now: pd.Timestamp) -> Metric | None:
+    """Running km done as a share of the km planned, over the 4 weeks ending yesterday.
+
+    Today is left out: its session is not due yet. None when there is no plan."""
+    if plan is None:
+        return None
+    planned = plan[~plan["type"].isin(NON_RUN_PLAN_TYPES)]
+    end = now - pd.Timedelta(days=1)
+
+    def window(last: pd.Timestamp) -> tuple[float, float]:
+        return (float(_last(runs, last)["distance_km"].sum()),
+                float(_last(planned, last)["distance_km"].sum()))
+
+    done, due = window(end)
+    done_before, due_before = window(end - pd.Timedelta(days=28))
+    if due <= 0:
+        return Metric("plan_done", "Plan done", None, None, "share",
+                      note="no planned distances in the last 4 weeks")
+    return Metric("plan_done", "Plan done", 100 * done / due,
+                  100 * done_before / due_before if due_before > 0 else None, "share",
+                  note="last 4 weeks to yesterday, vs the 4 before",
+                  detail=f"{done:.1f} of {due:.1f} km")
+
+
 def _volume(runs: pd.DataFrame, weekly: pd.DataFrame, now: pd.Timestamp) -> list[Metric]:
     monday = now - pd.Timedelta(days=now.weekday())
     week = float(_between(runs, monday, now)["distance_km"].sum())
@@ -140,7 +263,8 @@ def _fitness(acts: pd.DataFrame, runs: pd.DataFrame, weekly: pd.DataFrame, now: 
                      note="vs previous 4 weeks" if len(recent) else "no runs in the last 4 weeks")
     frequency = Metric("runs_per_week", "Runs per week", len(recent) / 4, len(before) / 4, "count",
                        _series(weekly["n_runs"]), note="4-week mean vs previous 4 weeks")
-    return [load, easy_card, longest, frequency]
+    extra = [card for card in (intensity_card(runs, now), vo2max_card(runs, now)) if card]
+    return [load, *extra, easy_card, longest, frequency]
 
 
 def _recovery(cfg: Config, now: pd.Timestamp, clock: float | None) -> list[Metric]:
@@ -189,8 +313,10 @@ def headline(*, activities: pd.DataFrame | None = None, today=None, cfg: Config 
     day = _now(today)
     runs = acts[acts["sport"].isin(RUN_SPORTS)]
     weekly = weekly_runs(TREND_WEEKS, activities=acts, today=day, cfg=cfg)
+    adherence = adherence_card(runs, read_plan(cfg, today=day)[0], day)
     return {
-        "volume": _volume(runs, weekly, day),
+        "volume": [*_volume(runs, weekly, day),
+                   *([adherence] if adherence is not None else [])],
         "fitness": _fitness(acts, runs, weekly, day, cfg),
         "recovery": _recovery(cfg, day, now),
     }

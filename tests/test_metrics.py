@@ -134,3 +134,112 @@ def test_a_blank_in_todays_wellness_row_falls_back_to_yesterday(cfg, tmp_path):
     assert recovery["hrv_ms"].value is None                    # nothing today or yesterday
     assert recovery["hrv_ms"].note == "no value since Sat 03 Oct"
     assert recovery["resting_hr"].note == "vs 4-week average"
+
+
+# ---- second round of cards: VO2max, intensity split, plan adherence, more recovery ----
+
+def _runs(rows):
+    """rows: (days ago, km, minutes, vo2max, aerobic TE, anaerobic TE)"""
+    return pd.DataFrame({
+        "activity_id": [f"r{i}" for i in range(len(rows))],
+        "sport": "Run",
+        "date": [pd.Timestamp(TODAY) - pd.Timedelta(days=r[0]) for r in rows],
+        "distance_km": [float(r[1]) for r in rows],
+        "duration_min": [float(r[2]) for r in rows],
+        "vo2max": [r[3] for r in rows],
+        "aerobic_te": [r[4] for r in rows],
+        "anaerobic_te": [r[5] for r in rows],
+    })
+
+
+NOW = pd.Timestamp(TODAY)
+
+
+def test_vo2max_is_the_latest_value_against_four_weeks_ago():
+    runs = _runs([(40, 8, 45, 50.0, 2.5, 0.0), (30, 8, 45, 51.0, 2.5, 0.0),
+                  (10, 8, 45, None, 2.5, 0.0), (3, 8, 45, 52.0, 2.5, 0.0),
+                  (1, 8, 45, None, 2.5, 0.0)])
+    card = metrics.vo2max_card(runs, NOW)
+    assert (card.key, card.label, card.unit) == ("vo2max", "VO2max", "score")
+    assert card.value == 52.0 and card.previous == 51.0
+    assert card.tone == "good" and card.note == "Garmin estimate, vs 4 weeks ago"
+    assert card.series == (50.0, 51.0, 52.0)
+
+
+def test_vo2max_without_a_recent_value_says_why_and_without_the_column_is_absent():
+    old = _runs([(40, 8, 45, 50.0, 2.5, 0.0), (2, 8, 45, None, 2.5, 0.0)])
+    card = metrics.vo2max_card(old, NOW)
+    assert card.value is None and card.note == "no VO2max value in the last 4 weeks"
+    assert metrics.vo2max_card(old.drop(columns="vo2max"), NOW) is None
+
+
+def test_intensity_split_by_training_effect():
+    runs = _runs([(2, 10, 60, None, 2.5, 0.0),        # easy
+                  (5, 6, 30, None, 3.2, 0.5),         # steady: aerobic effect 3 or more
+                  (9, 3, 10, None, 2.0, 2.5),         # hard: anaerobic effect 2 or more
+                  (12, 5, 99, None, None, None),      # no training effect: left out
+                  (35, 10, 50, None, 2.0, 0.0), (40, 10, 50, None, 4.5, 0.0)])
+    card = metrics.intensity_card(runs, NOW)
+    assert (card.key, card.unit) == ("easy_share", "share")
+    assert card.value == pytest.approx(60.0) and card.previous == pytest.approx(50.0)
+    assert card.detail == "30 % steady, 10 % hard"
+    assert card.note == "of running time, vs previous 4 weeks"
+    assert card.tone == "neutral"
+    assert metrics.intensity_card(runs.drop(columns="aerobic_te"), NOW) is None
+    assert metrics.intensity_card(runs[runs["date"] < NOW - pd.Timedelta(days=30)], NOW).value is None
+
+
+def test_intensity_weekly_table():
+    runs = _runs([(0, 10, 60, None, 2.5, 0.0), (0, 6, 30, None, 3.2, 0.5), (7, 3, 10, None, 2.0, 2.5)])
+    weekly = metrics.intensity_weekly(4, activities=runs, today=TODAY)
+    assert list(weekly.columns) == ["week_start", "easy_min", "steady_min", "hard_min"]
+    assert len(weekly) == 4
+    assert weekly.iloc[-1][["easy_min", "steady_min", "hard_min"]].tolist() == [60.0, 30.0, 0.0]
+    assert weekly.iloc[-2]["hard_min"] == 10.0
+
+
+def _plan(rows):
+    return pd.DataFrame({"date": [NOW - pd.Timedelta(days=d) for d, _, _ in rows],
+                         "type": [t for _, t, _ in rows],
+                         "distance_km": [km for _, _, km in rows]})
+
+
+def test_plan_adherence_is_done_over_planned_through_yesterday():
+    plan = _plan([(0, "easy", 99.0),                  # today: not due yet
+                  (2, "easy", 10.0), (5, "long", 20.0), (9, "rest", None), (20, "tempo", 10.0),
+                  (30, "easy", 10.0), (33, "strength", None)])
+    runs = _runs([(0, 5, 30, None, None, None), (2, 10, 60, None, None, None),
+                  (5, 15, 90, None, None, None), (21, 5, 30, None, None, None),
+                  (30, 12, 70, None, None, None)])
+    card = metrics.adherence_card(runs, plan, NOW)
+    assert (card.key, card.unit) == ("plan_done", "share")
+    assert card.value == pytest.approx(75.0)          # 30 of 40 km
+    assert card.previous == pytest.approx(120.0)      # 12 of 10 km
+    assert card.detail == "30.0 of 40.0 km"
+    assert card.note == "last 4 weeks to yesterday, vs the 4 before"
+
+
+def test_plan_adherence_without_planned_distances_says_why():
+    card = metrics.adherence_card(_runs([(2, 10, 60, None, None, None)]),
+                                  _plan([(2, "easy", None)]), NOW)
+    assert card.value is None and card.note == "no planned distances in the last 4 weeks"
+    assert metrics.adherence_card(_runs([]), None, NOW) is None
+
+
+def test_body_battery_and_stress_join_the_recovery_row(cfg, tmp_path):
+    path = tmp_path / "w.parquet"
+    dates = pd.date_range(end=pd.Timestamp(TODAY), periods=30)
+    pd.DataFrame({"date": dates, "readiness": 70.0, "body_battery": [80.0] * 29 + [60.0],
+                  "stress": [30.0] * 29 + [40.0]}).to_parquet(path)
+    recovery = by_key(metrics.headline(today=TODAY, cfg=replace(cfg, wellness_parquet=path))["recovery"])
+    assert list(recovery) == ["readiness", "body_battery", "stress"]
+    assert recovery["body_battery"].label == "Body battery" and recovery["body_battery"].tone == "bad"
+    assert recovery["stress"].label == "Stress" and recovery["stress"].tone == "bad"   # higher is worse
+
+
+def test_headline_places_the_new_cards(cfg, tmp_path):
+    c = replace(cfg, plan_csv=write_plan(tmp_path / "plan.csv"))
+    numbers = metrics.headline(today=TODAY, cfg=c)
+    assert [m.key for m in numbers["volume"]][-1] == "plan_done"
+    assert "vo2max" not in [m.key for m in numbers["fitness"]]      # no Garmin input here
+    assert "plan_done" not in [m.key for m in metrics.headline(today=TODAY, cfg=cfg)["volume"]]

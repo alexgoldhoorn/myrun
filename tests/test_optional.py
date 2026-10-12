@@ -171,7 +171,7 @@ def test_wellness_with_no_readable_dates_is_an_error(cfg, tmp_path):
 
 
 def test_wellness_without_any_known_metric_is_an_error_naming_them(cfg, tmp_path):
-    path = _wellness_file(tmp_path, pd.DataFrame({"date": ["2026-10-01"], "body_battery": [80]}))
+    path = _wellness_file(tmp_path, pd.DataFrame({"date": ["2026-10-01"], "steps": [8000]}))
     df, state = optional.read_wellness(with_inputs(cfg, wellness_parquet=path))
     assert df is None and state.status == "error"
     assert "readiness" in state.message and "hrv_ms" in state.message

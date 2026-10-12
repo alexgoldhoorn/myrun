@@ -135,3 +135,15 @@ def weekly_km_bars(weekly: pd.DataFrame) -> go.Figure:
     theme.style(fig, height=260)
     fig.update_layout(yaxis_title="Running km", xaxis_title=None)
     return fig
+
+
+def intensity_bars(weekly: pd.DataFrame) -> go.Figure:
+    """Running minutes per week, stacked by session intensity."""
+    fig = go.Figure()
+    for kind in ("easy", "steady", "hard"):
+        fig.add_trace(go.Bar(x=weekly["week_start"], y=weekly[f"{kind}_min"], name=kind,
+                             hovertemplate="week of %{x|%d %b}<br>%{y:.0f} min " + kind
+                                           + "<extra></extra>"))
+    theme.style(fig, height=300)
+    fig.update_layout(barmode="stack", yaxis_title="Running minutes", xaxis_title=None)
+    return fig

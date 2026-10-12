@@ -51,3 +51,8 @@ def test_metric_value_and_delta():
     assert fmt.metric_delta(5.0, "km") == "+5.0 km"
     assert fmt.metric_delta(-0.1, "pace") == "-6 s /km"
     assert fmt.metric_delta(None, "km") == ""
+
+
+def test_share_is_a_whole_percentage_and_changes_in_points():
+    assert fmt.metric_value(59.6, "share") == "60 %"
+    assert fmt.metric_delta(-12.4, "share") == "-12 pts"
