@@ -51,3 +51,17 @@ def test_trend_starts_at_the_first_month_with_data(cfg, tmp_path):
     assert list(trend.columns) == ["month", "value", "n_runs"]
     assert trend["value"].tolist() == [250.0] and trend["n_runs"].tolist() == [1]
     assert dynamics.available(df)[0] == "ground_contact_ms"
+
+
+def test_an_activity_that_is_not_a_run_has_no_cards():
+    frame = pd.DataFrame({
+        "activity_id": ["a", "b"],
+        "start": pd.to_datetime(["2026-09-01", "2026-09-10"]),
+        "sport": ["Run", "Ride"],
+        "surface": ["road", "road"],
+        "power_w": [300.0, 180.0],
+        "aerobic_te": [3.0, 2.5],
+    })
+    assert dynamics.activity_dynamics(frame.iloc[1], frame) == []
+    assert [c.key for c in dynamics.activity_dynamics(frame.iloc[0], frame)] == ["power_w",
+                                                                               "aerobic_te"]

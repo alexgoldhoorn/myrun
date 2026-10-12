@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 
 from myrun.activities import activities as _load
-from myrun.config import Config, load_config
+from myrun.config import RUN_SPORTS, Config, load_config
 from myrun.metric import Metric, clean
 from myrun.trends import easy_runs
 
@@ -29,6 +29,9 @@ def available(activities: pd.DataFrame) -> list[str]:
 def activity_dynamics(row: pd.Series, runs: pd.DataFrame, days: int = BASELINE_DAYS) -> list[Metric]:
     """One Metric per dynamics value this run has, against earlier runs on the same surface."""
     out = []
+    sport = row.get("sport")
+    if isinstance(sport, str) and sport not in RUN_SPORTS:
+        return out             # Garmin reports power and training effect for rides too
     surface = row.get("surface")
     earlier = runs[(runs["start"] < row["start"])
                    & (runs["start"] >= row["start"] - pd.Timedelta(days=days))]

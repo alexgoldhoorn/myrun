@@ -120,3 +120,17 @@ def test_weekly_runs_with_and_without_a_plan(cfg, tmp_path):
     planned = metrics.weekly_runs(4, today=TODAY,
                                   cfg=replace(cfg, plan_csv=write_plan(tmp_path / "plan.csv")))
     assert planned["planned_km"].notna().iloc[-1]             # the fixture plans the current week
+
+
+def test_a_blank_in_todays_wellness_row_falls_back_to_yesterday(cfg, tmp_path):
+    path = tmp_path / "w.parquet"
+    dates = pd.date_range(end=pd.Timestamp(TODAY), periods=30)
+    pd.DataFrame({"date": dates, "readiness": [70.0] * 28 + [64.0, None],
+                  "hrv_ms": [50.0] * 28 + [None, None], "resting_hr": [48.0] * 30,
+                  "sleep_hours": 7.0}).to_parquet(path)
+    recovery = by_key(metrics.headline(today=TODAY, cfg=replace(cfg, wellness_parquet=path))["recovery"])
+    assert recovery["readiness"].value == 64.0                 # yesterday's, today's is blank
+    assert recovery["readiness"].note == "Sun 04 Oct, vs 4-week average"
+    assert recovery["hrv_ms"].value is None                    # nothing today or yesterday
+    assert recovery["hrv_ms"].note == "no value since Sat 03 Oct"
+    assert recovery["resting_hr"].note == "vs 4-week average"

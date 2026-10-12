@@ -156,17 +156,25 @@ def _recovery(cfg: Config, now: pd.Timestamp, clock: float | None) -> list[Metri
     if reason is not None:
         return [Metric(c, _RECOVERY[c][0], None, None, _RECOVERY[c][1], note=reason)
                 for c in (present or list(_RECOVERY))]
-    latest = wellness.iloc[-1]
+    newest = wellness["date"].iloc[-1]
+    usable = wellness[wellness["date"] >= now - pd.Timedelta(days=1)]   # today or yesterday
     baseline = _last(wellness, now)
     out = []
     for column in present:
         label, unit, higher = _RECOVERY[column]
-        value, mean = clean(latest[column]), clean(baseline[column].mean())
+        filled = usable.dropna(subset=[column])
+        mean = clean(baseline[column].mean())
+        if filled.empty:
+            known = wellness.dropna(subset=[column])
+            value = None
+            note = (f"no value since {known['date'].iloc[-1]:%a %d %b}" if len(known)
+                    else "no values in the file")
+        else:
+            value, when = clean(filled[column].iloc[-1]), filled["date"].iloc[-1]
+            note = "vs 4-week average" if when == newest else f"{when:%a %d %b}, vs 4-week average"
         out.append(Metric(column, label, value, mean, unit,
                           _series(wellness[column].tail(RECOVERY_DAYS)),
-                          tone=_tone(value, mean, higher),
-                          note="vs 4-week average" if value is not None
-                          else f"no value for {latest['date']:%a %d %b}"))
+                          tone=_tone(value, mean, higher), note=note))
     return out
 
 
