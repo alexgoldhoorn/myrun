@@ -98,3 +98,13 @@ def test_weekly_km_bars_adds_the_plan_only_when_there_is_one():
     assert len(charts.weekly_km_bars(weekly).data) == 1
     weekly["planned_km"] = [20.0, 25.0]
     assert [t.name for t in charts.weekly_km_bars(weekly).data] == ["done", "planned"]
+
+
+def test_intensity_bars_stack_three_named_series_without_own_colours():
+    weekly = pd.DataFrame({"week_start": pd.to_datetime(["2026-09-28", "2026-10-05"]),
+                           "easy_min": [120.0, 60.0], "steady_min": [30.0, 0.0],
+                           "hard_min": [10.0, 20.0]})
+    fig = charts.intensity_bars(weekly)
+    assert [t.name for t in fig.data] == ["easy", "steady", "hard"]
+    assert fig.layout.barmode == "stack"
+    assert all(t.marker.color is None for t in fig.data)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import logging
 from pathlib import Path
 
 import pandas as pd
@@ -40,6 +41,7 @@ def _mtime(path: Path | None) -> float:
         return 0.0
 
 
+_log = logging.getLogger("myrun.cache")   # one debug line per real computation (a cache miss)
 CACHE_TTL_S = 300        # bounds how long an input's age or status can lag on screen
 CACHE_ENTRIES = 64         # per cache; stream tables and figures are the large ones
 
@@ -57,6 +59,7 @@ def _key(cfg: Config) -> tuple:
 
 @st.cache_data(show_spinner=False, max_entries=8)
 def _activities(_cfg: Config, key: tuple) -> pd.DataFrame:
+    _log.debug("computing activities")
     return activities(cfg=_cfg)
 
 
@@ -89,6 +92,9 @@ COMPUTE = {
     "efficiency": lambda cfg: trends.aerobic_efficiency(activities=load_activities(cfg), cfg=cfg),
     "volume": lambda cfg, by: trends.volume(by, activities=load_activities(cfg)),
     "best_efforts": lambda cfg: trends.best_efforts(cfg=cfg),
+    "vo2max_trend": lambda cfg: metrics.vo2max_trend(load_activities(cfg)),
+    "intensity_weekly": lambda cfg, weeks: metrics.intensity_weekly(
+        weeks, activities=load_activities(cfg), cfg=cfg),
     "dynamics_trend": lambda cfg, column: dynamics.dynamics_trend(
         column, activities=load_activities(cfg), cfg=cfg),
     "streams": lambda cfg, activity_id: streams.activity_streams(activity_id, cfg=cfg),
@@ -103,11 +109,13 @@ CLOCKED = frozenset({"input_states", "wellness", "headline"})
 
 @st.cache_data(show_spinner=False, max_entries=CACHE_ENTRIES)
 def _cached(name: str, _cfg: Config, key: tuple, args: tuple):
+    _log.debug("computing %s %s", name, args)
     return COMPUTE[name](_cfg, *args)
 
 
 @st.cache_data(show_spinner=False, ttl=CACHE_TTL_S, max_entries=CACHE_ENTRIES)
 def _cached_clocked(name: str, _cfg: Config, key: tuple, args: tuple):
+    _log.debug("computing %s %s", name, args)
     return COMPUTE[name](_cfg, *args)
 
 
@@ -120,6 +128,7 @@ def cached(name: str, cfg: Config, *args):
 
 @st.cache_data(show_spinner=False, max_entries=CACHE_ENTRIES)
 def _figure(name: str, _build, key: tuple, args: tuple):
+    _log.debug("building figure %s %s", name, args)
     return _build()
 
 

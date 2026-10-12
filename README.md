@@ -5,8 +5,9 @@ A personal training dashboard that sits on top of a
 database. It answers four questions, and links out to Strava, Garmin Connect and
 statistics-for-strava for everything else.
 
-- **Dashboard**: cards for volume, load and fitness, and recovery, each against the
-  period before; weekly load and weekly kilometres against the plan; this week's
+- **Dashboard**: cards for volume (with the share of the plan done), load and fitness
+  (with VO2max and the easy share of running time, from the Garmin input), and recovery,
+  each against the period before; weekly load and weekly kilometres against the plan; this week's
   sessions; recent runs.
 - **Trends**: aerobic efficiency, volume, best efforts, races, and running dynamics
   over time when the Garmin input is set.
@@ -28,7 +29,7 @@ Four more inputs are optional. Leave one out and its panels disappear.
 
 | Input | Format | Columns |
 |---|---|---|
-| Wellness | Parquet, one row per day | `date`, and any of `readiness`, `sleep_hours`, `hrv_ms`, `resting_hr`; other names can be mapped in the config |
+| Wellness | Parquet, one row per day | `date`, and any of `readiness`, `sleep_hours`, `hrv_ms`, `resting_hr`, `body_battery`, `stress`; other names can be mapped in the config |
 | Plan | CSV | `date` (ISO), `session`, `type` (for example `easy`, `tempo`, `intervals`, `long`, `race`, `rest`), `distance_km` |
 | Race log | CSV with your own headers, mapped in the config | at least a name and a date; optionally type, distance, official time, rank percentile, links |
 | Garmin activities | CSV or Parquet, one row per activity | `start` (local time), and any of `garmin_activity_id`, `session_name`, `session_type`, `ground_contact_ms`, `vertical_oscillation_cm`, `vertical_ratio_pct`, `stride_length_m`, `garmin_cadence_spm`, `power_w`, `aerobic_te`, `anaerobic_te`, `garmin_load`, `vo2max` |
@@ -43,6 +44,10 @@ uv sync
 cp config.example.yaml ~/my-myrun-config.yaml      # then edit strava_db and your HR zones
 MYRUN_CONFIG=~/my-myrun-config.yaml uv run streamlit run app/Dashboard.py
 ```
+
+To have the numbers ready before the first visit, start it through the launcher instead:
+`uv run python -m myrun.ui.warm run app/Dashboard.py`. It takes the same arguments as
+`streamlit` and keeps the result cache warm from a background thread.
 
 There is no login. Bind it to localhost or put it behind a reverse proxy that
 authenticates.

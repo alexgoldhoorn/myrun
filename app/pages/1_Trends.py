@@ -3,7 +3,7 @@
 import plotly.express as px
 import streamlit as st
 
-from myrun import dynamics, fmt, links, optional, trends
+from myrun import dynamics, fmt, links, metrics, optional, trends
 from myrun.config import RUN_SPORTS
 from myrun.ui import charts, common, theme
 
@@ -79,6 +79,25 @@ else:
         return theme.style(figure, height=360)
 
     st.plotly_chart(common.figure("best_efforts", cfg, _efforts_figure, int(distance)))
+
+# ---- VO2max and intensity (Garmin) -----------------------------------------
+vo2max = common.cached("vo2max_trend", cfg)
+if len(vo2max):
+    st.subheader("VO2max")
+    st.plotly_chart(common.figure(
+        "vo2max", cfg, lambda: charts.trend_line(vo2max, "month", "value", "VO2max")))
+    st.caption("Garmin's estimate, monthly median over runs.")
+
+if "aerobic_te" in runs and runs["aerobic_te"].notna().any():
+    st.subheader("Intensity")
+    span = st.radio("Weeks", [12, 26, 52], horizontal=True)
+    st.plotly_chart(common.figure(
+        "intensity", cfg,
+        lambda: charts.intensity_bars(common.cached("intensity_weekly", cfg, span)), span))
+    st.caption(f"Running minutes per week by session intensity, from Garmin's training effect: "
+               f"hard is an aerobic effect of {metrics.HARD_AEROBIC_TE:g} or more or an "
+               f"anaerobic effect of {metrics.HARD_ANAEROBIC_TE:g} or more, steady an aerobic "
+               f"effect of {metrics.STEADY_AEROBIC_TE:g} or more, the rest easy.")
 
 # ---- running dynamics -----------------------------------------------------
 dynamic_columns = dynamics.available(runs)

@@ -258,3 +258,25 @@ def test_dashboard_shows_a_changed_plan_without_a_restart(everything, tmp_path):
     os.utime(plan, (stamp, stamp))
     text = _text(run_page("Dashboard.py"))
     assert "Night Race 30km" in text and "Trail Race 23km" not in text
+
+
+def test_dashboard_shows_the_second_round_of_cards(everything):
+    text = _text(run_page("Dashboard.py"))
+    for label in ("Plan done", "Easy share", "VO2max"):
+        assert label in text
+
+
+def test_dashboard_hides_cards_whose_input_is_not_configured(baseline):
+    text = _text(run_page("Dashboard.py"))
+    for label in ("Plan done", "Easy share", "VO2max"):
+        assert label not in text
+
+
+def test_trends_page_shows_vo2max_and_intensity_with_the_feed(everything):
+    text = _text(run_page("pages/1_Trends.py"))
+    assert "VO2max" in text and "Intensity" in text
+
+
+def test_trends_page_hides_vo2max_and_intensity_without_the_feed(baseline):
+    text = _text(run_page("pages/1_Trends.py"))
+    assert "VO2max" not in text and "Intensity" not in text

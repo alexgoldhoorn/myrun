@@ -18,7 +18,7 @@ import pandas as pd
 from myrun.config import RUN_SPORTS, Config, load_config
 from myrun.stravadb import db_mtime
 
-WELLNESS_COLUMNS = ("readiness", "sleep_hours", "hrv_ms", "resting_hr")
+WELLNESS_COLUMNS = ("readiness", "sleep_hours", "hrv_ms", "resting_hr", "body_battery", "stress")
 GARMIN_NUMERIC = ("ground_contact_ms", "vertical_oscillation_cm", "vertical_ratio_pct",
                   "stride_length_m", "garmin_cadence_spm", "power_w", "aerobic_te",
                   "anaerobic_te", "garmin_load", "vo2max")

@@ -225,7 +225,7 @@ def write_garmin_csv(path: Path, today: date = TODAY) -> Path:
         "vertical_oscillation_cm,vertical_ratio_pct,stride_length_m,garmin_cadence_spm,"
         "power_w,aerobic_te,anaerobic_te,garmin_load,vo2max\n"
         f"{first:%Y-%m-%d %H:%M:%S},111,running,Tempo 7km,tempo,250.0,8.5,8.8,1.10,170.0,"
-        "340.0,3.1,0.0,60.0,\n"
+        "340.0,3.1,0.0,60.0,52.0\n"
         f"{second:%Y-%m-%d %H:%M:%S},222,running,Somewhere else,,--,9.0,9.1,1.05,168.0,"
         ",2.0,0.0,40.0,\n"
     )

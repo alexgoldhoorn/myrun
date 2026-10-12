@@ -83,9 +83,9 @@ def test_wellness_columns_are_read_and_validated(tmp_path):
     cfg = load_config(_write(tmp_path, "strava_db: /d.db\n"
                                        "wellness_columns: {date: local_date, hrv_ms: hrv}\n"))
     assert cfg.wellness_columns == {"date": "local_date", "hrv_ms": "hrv"}
-    with pytest.raises(ConfigError, match="body_battery"):
+    with pytest.raises(ConfigError, match="steps"):
         load_config(_write(tmp_path, "strava_db: /d.db\n"
-                                     "wellness_columns: {body_battery: bb}\n"))
+                                     "wellness_columns: {steps: st}\n"))
 
 
 def test_the_old_garmin_key_is_still_accepted(tmp_path):
