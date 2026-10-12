@@ -5,14 +5,12 @@ import datetime as dt
 import pandas as pd
 import streamlit as st
 
-from myrun import links, metrics, optional
-from myrun.load import weekly_load
-from myrun.planmatch import plan_vs_actual
+from myrun import links
 from myrun.ui import cards, charts, common
 
 cfg = common.setup("Dashboard")
 acts = common.load_activities(cfg)
-states = optional.input_states(cfg)
+states = common.cached("input_states", cfg)
 today = pd.Timestamp(dt.date.today())
 
 common.banner(states)
@@ -23,7 +21,7 @@ if acts.empty:
     st.stop()
 
 # ---- header strip ---------------------------------------------------------
-plan, plan_state = optional.read_plan(cfg)
+plan, plan_state = common.cached("plan", cfg)
 strip = []
 if plan is not None:
     upcoming = plan[(plan["type"] == "race") & (plan["date"] >= today)]
@@ -38,13 +36,13 @@ strip.append(("Newest activity", f"{acts['start'].max():%a %d %b %H:%M}"))
 st.markdown(cards.strip_html(strip), unsafe_allow_html=True)
 
 # ---- cards ----------------------------------------------------------------
-numbers = metrics.headline(activities=acts, cfg=cfg)
+numbers = common.cached("headline", cfg)
 st.subheader("Volume")
 cards.card_row(numbers["volume"])
 st.subheader("Load and fitness")
 cards.card_row(numbers["fitness"])
 
-wellness, wellness_state = optional.read_wellness(cfg)
+wellness, wellness_state = common.cached("wellness", cfg)
 if wellness_state.status != "off":
     st.subheader("Recovery")
     usable = common.notice(wellness_state)
@@ -56,14 +54,16 @@ if wellness_state.status != "off":
 left, right = st.columns(2)
 with left:
     st.subheader("Weekly load")
-    st.plotly_chart(charts.load_bars(weekly_load(12, activities=acts, cfg=cfg)))
+    st.plotly_chart(common.figure("weekly_load", cfg,
+                                  lambda: charts.load_bars(common.cached("weekly_load", cfg, 12))))
 with right:
     st.subheader("Weekly running km")
-    st.plotly_chart(charts.weekly_km_bars(metrics.weekly_runs(12, activities=acts, cfg=cfg)))
+    st.plotly_chart(common.figure(
+        "weekly_km", cfg, lambda: charts.weekly_km_bars(common.cached("weekly_runs", cfg, 12))))
 
 # ---- this week ------------------------------------------------------------
 st.subheader("This week")
-week = plan_vs_actual(activities=acts, cfg=cfg)
+week = common.cached("plan_vs_actual", cfg)
 table = pd.DataFrame({"Day": week["date"].dt.strftime("%a %d %b"), "Done": week["actual"]})
 if plan is not None:
     table.insert(1, "Planned", week["planned"])

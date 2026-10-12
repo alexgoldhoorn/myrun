@@ -1,5 +1,6 @@
 """Smoke tests: every page renders, in every input configuration, without an exception."""
 
+import os
 from datetime import date
 from pathlib import Path
 
@@ -247,3 +248,13 @@ def test_trends_page_shows_running_dynamics_with_the_feed(everything):
 
 def test_trends_page_hides_running_dynamics_without_the_feed(baseline):
     assert "Running dynamics" not in _text(run_page("pages/1_Trends.py"))
+
+
+def test_dashboard_shows_a_changed_plan_without_a_restart(everything, tmp_path):
+    assert "Trail Race 23km" in _text(run_page("Dashboard.py"))
+    plan = tmp_path / "plan.csv"
+    plan.write_text(plan.read_text().replace("Trail Race 23km", "Night Race 30km"))
+    stamp = plan.stat().st_mtime + 60
+    os.utime(plan, (stamp, stamp))
+    text = _text(run_page("Dashboard.py"))
+    assert "Night Race 30km" in text and "Trail Race 23km" not in text

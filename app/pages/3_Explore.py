@@ -2,13 +2,13 @@
 
 import streamlit as st
 
-from myrun import explore, optional
+from myrun import explore
 from myrun.config import RUN_SPORTS
 from myrun.ui import charts, common
 
 cfg = common.setup("Explore")
 acts = common.load_activities(cfg)
-states = optional.input_states(cfg)
+states = common.cached("input_states", cfg)
 
 common.banner(states)
 st.title("Explore")
