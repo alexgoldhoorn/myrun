@@ -7,7 +7,7 @@ import streamlit as st
 from myrun import dynamics, fmt, links, optional, trends
 from myrun.config import RUN_SPORTS
 from myrun.hr import hr_settings
-from myrun.ui import charts, common
+from myrun.ui import charts, common, theme
 
 cfg = common.setup("Trends")
 acts = common.load_activities(cfg)
@@ -39,19 +39,21 @@ elif efficiency.empty:
     st.info("No runs qualify. Set hr.easy_band in the config if the band above is not yours.")
 else:
     shown = efficiency.assign(median_pace=efficiency["median_pace_min_km"].map(fmt.pace))
-    st.plotly_chart(px.line(shown, x="month", y="efficiency", markers=True,
-                            hover_data={"n_runs": True, "median_pace": True}))
+    st.plotly_chart(theme.style(px.line(shown, x="month", y="efficiency", markers=True,
+                                        hover_data={"n_runs": True, "median_pace": True}),
+                                height=320))
 
 # ---- volume ---------------------------------------------------------------
 st.subheader("Volume")
 left, right = st.columns(2)
 by = left.radio("Per", ["week", "month", "year"], index=1, horizontal=True)
 measure = right.radio("Measure", ["distance_km", "duration_h", "elevation_m"], horizontal=True)
-st.plotly_chart(px.bar(trends.volume(by, activities=acts), x="period", y=measure, color="sport"))
+st.plotly_chart(theme.style(px.bar(trends.volume(by, activities=acts), x="period", y=measure,
+                                   color="sport"), height=360))
 if len(runs):
     st.caption("Running distance, cumulative through each year.")
-    st.plotly_chart(px.line(trends.year_over_year(runs), x="day_of_year", y="cumulative_km",
-                            color="year"))
+    st.plotly_chart(theme.style(px.line(trends.year_over_year(runs), x="day_of_year",
+                                        y="cumulative_km", color="year"), height=360))
 
 # ---- best efforts ---------------------------------------------------------
 st.subheader("Best efforts")
@@ -69,7 +71,7 @@ else:
     vals, text = fmt.duration_ticks(chosen["time_s"])
     figure.update_yaxes(autorange="reversed", title="Time",
                         **(dict(tickmode="array", tickvals=vals, ticktext=text) if vals else {}))
-    st.plotly_chart(figure)
+    st.plotly_chart(theme.style(figure, height=360))
 
 # ---- running dynamics -----------------------------------------------------
 dynamic_columns = dynamics.available(runs)
@@ -97,7 +99,7 @@ if race_state.status != "off":
             figure = px.scatter(races, x="date", y="rank_pct", hover_name="name",
                                 color="type" if "type" in races else None)
             figure.update_yaxes(autorange="reversed", title="Rank percentile (lower is better)")
-            st.plotly_chart(figure)
+            st.plotly_chart(theme.style(figure, height=360))
         races = links.fill_race_garmin_urls(races, acts)
         links_config = {c: st.column_config.LinkColumn(display_text="open")
                         for c in ("garmin_url", "strava_url") if c in races}
@@ -114,7 +116,7 @@ if wellness_state.status != "off":
         monthly = (wellness.assign(month=wellness["date"].dt.to_period("M").dt.start_time)
                    .groupby("month", as_index=False)[present].mean())
         for column in present:
-            st.plotly_chart(px.line(monthly, x="month", y=column, markers=True),
-                            key=f"wellness-{column}")
+            st.plotly_chart(theme.style(px.line(monthly, x="month", y=column, markers=True),
+                                        height=320), key=f"wellness-{column}")
 
 common.footer(acts, states)

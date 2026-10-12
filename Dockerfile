@@ -5,6 +5,7 @@ COPY pyproject.toml uv.lock README.md ./
 COPY myrun ./myrun
 RUN uv sync --frozen --no-dev
 COPY app ./app
+COPY .streamlit ./.streamlit
 ENV HOME=/tmp MYRUN_CONFIG=/config/config.yaml
 EXPOSE 8501
 USER 1000:1000

@@ -12,11 +12,13 @@ from myrun.config import Config, ConfigError, load_config
 from myrun.optional import InputState
 from myrun.splits import splits
 from myrun.stravadb import StravaDbError, db_mtime, open_db
+from myrun.ui import theme
 
 
 def setup(title: str) -> Config:
     """First call of every page. Stops the page with one error if it cannot start."""
     st.set_page_config(page_title=f"myrun · {title}", layout="wide")
+    theme.apply()
     try:
         cfg = load_config()
         open_db(cfg).close()
