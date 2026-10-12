@@ -23,7 +23,7 @@ class Config:
     wellness_parquet: Path | None = None
     plan_csv: Path | None = None
     race_log_csv: Path | None = None
-    garmin_activities_parquet: Path | None = None
+    garmin_activities: Path | None = None
     race_log_columns: dict[str, str] = field(default_factory=dict)
     race_log_date_format: str = "%d/%m/%Y"
     wellness_columns: dict[str, str] = field(default_factory=dict)
@@ -41,7 +41,8 @@ class Config:
 
 _TOP = {"strava_db", "cache_dir", "inputs", "race_log_columns", "race_log_date_format", "wellness_columns", "links",
         "hr", "thresholds"}
-_INPUTS = {"wellness_parquet", "plan_csv", "race_log_csv", "garmin_activities_parquet"}
+_INPUTS = {"wellness_parquet", "plan_csv", "race_log_csv", "garmin_activities"}
+_OLD_INPUTS = {"garmin_activities_parquet": "garmin_activities"}   # still accepted
 _LINKS = {"statistics_for_strava_url"}
 _HR = {"max_hr", "zone_upper_bounds", "easy_band"}
 _THRESHOLDS = {"mixed_hilliness_m_per_km", "efficiency_max_hilliness_m_per_km",
@@ -77,7 +78,7 @@ def load_config(path: str | Path | None = None) -> Config:
     if not raw.get("strava_db"):
         raise ConfigError(f"{source}: 'strava_db' is required")
 
-    inputs = _section(raw, "inputs", _INPUTS, source)
+    inputs = _section(raw, "inputs", _INPUTS | set(_OLD_INPUTS), source)
     links = _section(raw, "links", _LINKS, source)
     hr = _section(raw, "hr", _HR, source)
     thresholds = _section(raw, "thresholds", _THRESHOLDS, source)
@@ -85,6 +86,11 @@ def load_config(path: str | Path | None = None) -> Config:
     kwargs: dict = {"strava_db": _path(raw["strava_db"])}
     if raw.get("cache_dir"):
         kwargs["cache_dir"] = _path(raw["cache_dir"])
+    for old, new in _OLD_INPUTS.items():
+        if inputs.get(old):
+            if inputs.get(new):
+                raise ConfigError(f"{source}: set '{new}' or '{old}' in 'inputs', not both")
+            inputs = {**inputs, new: inputs[old]}
     for key in _INPUTS:
         kwargs[key] = _path(inputs.get(key))
     if raw.get("race_log_columns"):

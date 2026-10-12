@@ -19,8 +19,10 @@ from myrun.config import RUN_SPORTS, Config, load_config
 from myrun.stravadb import db_mtime
 
 WELLNESS_COLUMNS = ("readiness", "sleep_hours", "hrv_ms", "resting_hr")
-GARMIN_COLUMNS = ("garmin_activity_id", "session_name", "session_type", "vertical_oscillation_cm",
-                  "ground_contact_ms", "stride_length_m")
+GARMIN_NUMERIC = ("ground_contact_ms", "vertical_oscillation_cm", "vertical_ratio_pct",
+                  "stride_length_m", "garmin_cadence_spm", "power_w", "aerobic_te",
+                  "anaerobic_te", "garmin_load", "vo2max")
+GARMIN_COLUMNS = ("garmin_activity_id", "session_name", "session_type", *GARMIN_NUMERIC)
 RACE_TEXT = ("name", "place", "type", "garmin_url", "strava_url", "diploma_url")
 NON_RUN_PLAN_TYPES = ("rest", "strength")
 SURFACES = ("road", "mixed", "trail")
@@ -169,13 +171,16 @@ def read_races(cfg: Config):
 
 
 def read_garmin_activities(cfg: Config, now: float | None = None):
-    name, path = "garmin_activities", cfg.garmin_activities_parquet
+    name, path = "garmin_activities", cfg.garmin_activities
     if path is None:
         return _off(name)
     if not path.is_file():
         return _error(name, f"file not found: {path.name}")
+    suffix = path.suffix.lower()
+    if suffix not in (".csv", ".parquet"):
+        return _error(name, f"{path.name} must be a .csv or .parquet file")
     try:
-        df = pd.read_parquet(path)
+        df = pd.read_csv(path, dtype=str) if suffix == ".csv" else pd.read_parquet(path)
     except Exception as exc:
         return _error(name, f"cannot read {path.name}: {exc}")
     if "start" not in df.columns:
@@ -185,6 +190,13 @@ def read_garmin_activities(cfg: Config, now: float | None = None):
         return _error(name, f"'start' in {path.name} carries a timezone; it must be the local "
                             "wall-clock time without one, as Strava records it")
     df["start"] = start.astype("datetime64[ns]")
+    for column in (*GARMIN_NUMERIC, "garmin_activity_id"):
+        if column in df.columns:
+            df[column] = pd.to_numeric(df[column], errors="coerce").astype("float64")
+    for column in ("session_name", "session_type"):
+        if column in df.columns:
+            text = df[column].astype("string").str.strip()
+            df[column] = none_if_missing(text.where(text != "", None))
     df = df.dropna(subset=["start"]).sort_values("start").reset_index(drop=True)
     return df, _file_state(name, path, cfg, now)
 

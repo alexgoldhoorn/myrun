@@ -75,3 +75,37 @@ def duration_ticks(values) -> tuple[list[float], list[str]]:
     """Round tick positions for a duration axis in seconds, and their labels."""
     ticks = _ticks(values, _DURATION_STEPS)
     return ticks, [duration(t) for t in ticks]
+
+
+_VALUE_FORMATS = {
+    "km": "{:.1f} km", "m": "{:,.0f} m", "metres": "{:.2f} m", "ratio": "{:.2f}",
+    "count": "{:.1f}", "score": "{:.0f}", "ms": "{:.0f} ms", "bpm": "{:.0f} bpm",
+    "hours": "{:.1f} h", "cm": "{:.1f} cm", "pct": "{:.1f} %", "w": "{:.0f} W", "te": "{:.1f}",
+}
+_DELTA_FORMATS = {
+    "km": "{:+.1f} km", "m": "{:+,.0f} m", "metres": "{:+.2f} m", "ratio": "{:+.2f}",
+    "count": "{:+.1f}", "score": "{:+.0f}", "ms": "{:+.0f} ms", "bpm": "{:+.0f} bpm",
+    "hours": "{:+.1f} h", "cm": "{:+.1f} cm", "pct": "{:+.1f} %", "w": "{:+.0f} W",
+    "te": "{:+.1f}",
+}
+
+
+def metric_value(value, unit: str) -> str:
+    """A headline value with its unit; 'n/a' when missing."""
+    number = _number(value)
+    if number is None:
+        return "n/a"
+    if unit == "pace":
+        text = pace(number)
+        return text if text == "n/a" else f"{text} /km"
+    return _VALUE_FORMATS[unit].format(number)
+
+
+def metric_delta(delta, unit: str) -> str:
+    """A signed change in the unit of the value; '' when there is none."""
+    number = _number(delta)
+    if number is None:
+        return ""
+    if unit == "pace":
+        return f"{number * 60:+.0f} s /km"
+    return _DELTA_FORMATS[unit].format(number)

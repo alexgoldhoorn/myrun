@@ -65,6 +65,23 @@ def best_efforts(distances=(1000, 5000, 10000, 21097), *, cfg: Config | None = N
     return df[["activity_id", "date", "distance_m", "time_s", "pace_min_km", "is_record"]]
 
 
+def easy_runs(activities: pd.DataFrame, cfg: Config) -> pd.DataFrame:
+    """Easy, flat road runs of at least MIN_EFFICIENCY_MINUTES: comparable from month to month.
+
+    Empty when no easy heart-rate band can be established."""
+    band = hr_settings(cfg, activities).easy_band
+    if band is None:
+        return activities.iloc[0:0].copy()
+    low, high = band
+    return activities[
+        (activities["sport"] == "Run")
+        & (activities["duration_min"] >= MIN_EFFICIENCY_MINUTES)
+        & (activities["hilliness_m_km"] < cfg.efficiency_max_hilliness_m_per_km)
+        & activities["avg_hr"].between(low, high)
+        & (activities["speed_kmh"] > 0)
+    ].copy()
+
+
 def aerobic_efficiency(*, activities: pd.DataFrame | None = None,
                        cfg: Config | None = None) -> pd.DataFrame:
     """Monthly median of speed (m/min) per heartbeat on easy, flat road runs."""
@@ -73,14 +90,7 @@ def aerobic_efficiency(*, activities: pd.DataFrame | None = None,
     band = hr_settings(cfg, acts).easy_band
     if band is None:
         return pd.DataFrame(columns=["month", "efficiency", "n_runs", "median_pace_min_km"])
-    low, high = band
-    easy = acts[
-        (acts["sport"] == "Run")
-        & (acts["duration_min"] >= MIN_EFFICIENCY_MINUTES)
-        & (acts["hilliness_m_km"] < cfg.efficiency_max_hilliness_m_per_km)
-        & acts["avg_hr"].between(low, high)
-        & (acts["speed_kmh"] > 0)
-    ].copy()
+    easy = easy_runs(acts, cfg)
     easy["efficiency"] = easy["speed_kmh"] * 1000 / 60 / easy["avg_hr"]
     easy["month"] = easy["date"].dt.to_period("M").dt.start_time
     return easy.groupby("month", as_index=False).agg(

@@ -8,9 +8,12 @@ inputs:                               # each is optional; leave out what you do 
   wellness_parquet:                   # columns: date, readiness, sleep_hours, hrv_ms, resting_hr
   plan_csv:                           # columns: date, session, type, distance_km
   race_log_csv:                       # your own columns, mapped below
-  garmin_activities_parquet:          # columns: start, garmin_activity_id, session_name,
-                                      #   session_type, vertical_oscillation_cm,
-                                      #   ground_contact_ms, stride_length_m
+  garmin_activities:                  # .csv or .parquet. Required column: start (local time).
+                                      #   Optional: garmin_activity_id, session_name,
+                                      #   session_type, ground_contact_ms,
+                                      #   vertical_oscillation_cm, vertical_ratio_pct,
+                                      #   stride_length_m, garmin_cadence_spm, power_w,
+                                      #   aerobic_te, anaerobic_te, garmin_load, vo2max
 
 race_log_columns:                     # field: header in your CSV. name and date are required.
   name: name

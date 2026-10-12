@@ -7,7 +7,7 @@ import pytest
 
 from myrun import optional
 from myrun.activities import activities, runs
-from tests.fixture import (HILLY, RACE, RACE_COLUMNS, STEADY, TODAY, TRAIL, write_garmin,
+from tests.fixture import (HILLY, RACE, RACE_COLUMNS, STEADY, TODAY, TRAIL, write_garmin, write_garmin_csv,
                            write_plan, write_races, write_wellness)
 
 
@@ -109,7 +109,7 @@ def test_without_inputs_only_strava_workout_type_is_used(cfg):
 
 
 def test_garmin_join_by_start_time(cfg, tmp_path):
-    c = with_inputs(cfg, garmin_activities_parquet=write_garmin(tmp_path / "g.parquet"))
+    c = with_inputs(cfg, garmin_activities=write_garmin(tmp_path / "g.parquet"))
     df = runs(cfg=c).set_index("activity_id")
     assert df.loc[STEADY, "garmin_activity_id"] == 111        # 30 s apart: matched
     assert df.loc[STEADY, "ground_contact_ms"] == 250.0
@@ -121,7 +121,7 @@ def test_garmin_join_by_start_time(cfg, tmp_path):
 
 def test_session_type_precedence(cfg, tmp_path):
     c = with_inputs(cfg, plan_csv=write_plan(tmp_path / "p.csv"),
-                    garmin_activities_parquet=write_garmin(tmp_path / "g.parquet"))
+                    garmin_activities=write_garmin(tmp_path / "g.parquet"))
     types = _types(c)
     assert types[STEADY] == "tempo"         # Garmin wins over the plan's "easy"
     assert types[HILLY] == "intervals"      # from the plan, by date
@@ -141,7 +141,7 @@ def test_race_log_sets_surface_and_name(cfg, tmp_path):
 def test_a_broken_optional_file_does_not_break_activities(cfg, tmp_path):
     junk = tmp_path / "junk.parquet"
     junk.write_bytes(b"nope")
-    c = with_inputs(cfg, garmin_activities_parquet=junk, plan_csv=tmp_path / "absent.csv")
+    c = with_inputs(cfg, garmin_activities=junk, plan_csv=tmp_path / "absent.csv")
     assert len(activities(cfg=c)) == 7
 
 
@@ -194,7 +194,7 @@ def test_garmin_start_with_a_timezone_is_an_error(cfg, tmp_path):
     path = tmp_path / "tz.parquet"
     pd.DataFrame({"start": pd.to_datetime(["2026-10-04 05:30"]).tz_localize("UTC"),
                   "garmin_activity_id": [1]}).to_parquet(path)
-    df, state = optional.read_garmin_activities(with_inputs(cfg, garmin_activities_parquet=path))
+    df, state = optional.read_garmin_activities(with_inputs(cfg, garmin_activities=path))
     assert df is None and state.status == "error" and "timezone" in state.message
 
 
@@ -222,3 +222,32 @@ def test_wellness_mapping_naming_an_absent_column_is_an_error(cfg, tmp_path):
                     wellness_columns={"date": "local_date", "hrv_ms": "hrv_nightly"})
     df, state = optional.read_wellness(c)
     assert df is None and state.status == "error" and "hrv_nightly" in state.message
+
+
+def test_garmin_csv_is_read_like_parquet(cfg, tmp_path):
+    c = with_inputs(cfg, garmin_activities=write_garmin_csv(tmp_path / "g.csv"))
+    df = runs(cfg=c).set_index("activity_id")
+    assert df.loc[STEADY, "garmin_activity_id"] == 111
+    assert df.loc[STEADY, "session_name"] == "Tempo 7km"
+    assert df.loc[STEADY, "session_type"] == "tempo"
+    assert df.loc[STEADY, "power_w"] == 340.0
+    assert df.loc[STEADY, "vertical_ratio_pct"] == 8.8
+    assert pd.isna(df.loc[HILLY, "garmin_activity_id"])       # 10 min apart: not matched
+
+
+def test_garmin_values_that_are_not_numbers_become_missing(cfg, tmp_path):
+    c = with_inputs(cfg, garmin_activities=write_garmin_csv(tmp_path / "g.csv"))
+    df, state = optional.read_garmin_activities(c)
+    assert state.status == "ok"
+    junk = df.set_index("garmin_activity_id").loc[222]        # rows are sorted by start
+    assert pd.isna(junk["ground_contact_ms"])                 # "--" in the file
+    assert pd.isna(junk["power_w"])                           # blank in the file
+    assert df["ground_contact_ms"].dtype == "float64"
+    assert junk["session_type"] is None or pd.isna(junk["session_type"])
+
+
+def test_garmin_file_with_an_unknown_suffix_is_an_error(cfg, tmp_path):
+    path = tmp_path / "g.txt"
+    path.write_text("start\n")
+    df, state = optional.read_garmin_activities(with_inputs(cfg, garmin_activities=path))
+    assert df is None and state.status == "error" and ".csv or .parquet" in state.message

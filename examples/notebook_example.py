@@ -22,6 +22,6 @@ print(splits.groupby("grade_class")[["avg_hr", "pace_min_km"]].median())
 latest = runs[runs["has_streams"]].iloc[-1]["activity_id"]
 print(myrun.activity_streams(latest).describe())
 
-# What the Now page shows.
+# What the Dashboard page shows.
 print(myrun.load_status())
 print(myrun.input_status())

@@ -37,3 +37,17 @@ def test_pace_ticks_are_round_and_few():
 def test_duration_ticks():
     vals, text = fmt.duration_ticks(pd.Series([1330, 1500, 1667]))
     assert text[0] == "23:00" and all(v % 60 == 0 for v in vals) and len(vals) <= 8
+
+
+def test_metric_value_and_delta():
+    assert fmt.metric_value(47.25, "km") == "47.2 km"
+    assert fmt.metric_value(1890, "m") == "1,890 m"
+    assert fmt.metric_value(1.014, "metres") == "1.01 m"
+    assert fmt.metric_value(5.556, "pace") == "5:33 /km"
+    assert fmt.metric_value(1.566, "ratio") == "1.57"
+    assert fmt.metric_value(7.25, "hours") == "7.2 h"
+    assert fmt.metric_value(None, "km") == "n/a"
+    assert fmt.metric_value(float("nan"), "bpm") == "n/a"
+    assert fmt.metric_delta(5.0, "km") == "+5.0 km"
+    assert fmt.metric_delta(-0.1, "pace") == "-6 s /km"
+    assert fmt.metric_delta(None, "km") == ""

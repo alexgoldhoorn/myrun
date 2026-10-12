@@ -7,11 +7,11 @@ import pytest
 import yaml
 from streamlit.testing.v1 import AppTest
 
-from tests.fixture import (RACE_COLUMNS, build_fixture, write_garmin, write_plan, write_races,
+from tests.fixture import (RACE_COLUMNS, build_fixture, write_garmin_csv, write_plan, write_races,
                            write_wellness)
 
 ROOT = Path(__file__).resolve().parents[1]
-PAGES = ["Now.py", "pages/1_Trends.py", "pages/2_Activity.py", "pages/3_Explore.py"]
+PAGES = ["Dashboard.py", "pages/1_Trends.py", "pages/2_Activity.py", "pages/3_Explore.py"]
 
 
 def write_config(tmp_path, db, **inputs) -> Path:
@@ -53,7 +53,7 @@ def everything(tmp_path, monkeypatch):
         wellness_parquet=write_wellness(tmp_path / "w.parquet", today),
         plan_csv=write_plan(tmp_path / "plan.csv", today),
         race_log_csv=write_races(tmp_path / "races.csv", today),
-        garmin_activities_parquet=write_garmin(tmp_path / "g.parquet", today),
+        garmin_activities=write_garmin_csv(tmp_path / "g.csv", today),
     )
     monkeypatch.setenv("MYRUN_CONFIG", str(config))
 
@@ -70,7 +70,7 @@ def broken_inputs(tmp_path, monkeypatch):
     junk = tmp_path / "junk.parquet"
     junk.write_bytes(b"nope")
     config = write_config(tmp_path, db, wellness_parquet=junk, plan_csv=tmp_path / "absent.csv",
-                          garmin_activities_parquet=junk)
+                          garmin_activities=junk)
     monkeypatch.setenv("MYRUN_CONFIG", str(config))
 
 
@@ -121,7 +121,7 @@ def test_stale_garmin_file_is_named_on_every_page(everything, page, tmp_path):
     import time
 
     old = time.time() - 200 * 3600
-    os.utime(tmp_path / "g.parquet", (old, old))
+    os.utime(tmp_path / "g.csv", (old, old))
     at = run_page(page)
     assert not at.exception
     assert any("garmin_activities" in str(w.value) and "200" in str(w.value) for w in at.warning)
@@ -133,7 +133,7 @@ def test_stale_wellness_hides_recovery_values(everything, tmp_path):
 
     old = time.time() - 50 * 3600
     os.utime(tmp_path / "w.parquet", (old, old))
-    at = run_page("Now.py")
+    at = run_page("Dashboard.py")
     assert not at.exception
     assert any("wellness" in str(w.value) for w in at.warning)
     assert "Values for" not in _text(at)
@@ -141,27 +141,35 @@ def test_stale_wellness_hides_recovery_values(everything, tmp_path):
 
 def test_missing_database_is_one_clear_error(tmp_path, monkeypatch):
     monkeypatch.setenv("MYRUN_CONFIG", str(write_config(tmp_path, tmp_path / "absent.db")))
-    at = run_page("Now.py")
+    at = run_page("Dashboard.py")
     assert not at.exception
     assert len(at.error) == 1 and "not found" in at.error[0].value
 
 
-def test_now_page_content_baseline(baseline):
-    text = _text(run_page("Now.py"))
-    assert "Load" in text and "Last 7 days" in text
+def test_dashboard_content_baseline(baseline):
+    text = _text(run_page("Dashboard.py"))
+    for label in ("This week", "Last 4 weeks", "Year to date", "Load, 7 days vs 4 weeks",
+                  "Easy pace", "Longest run, 4 weeks", "Runs per week", "Recent runs"):
+        assert label in text
     assert "Next race" not in text and "Recovery" not in text       # hidden, not configured
 
 
-def test_now_page_content_with_inputs(everything):
-    text = _text(run_page("Now.py"))
+def test_dashboard_content_with_inputs(everything):
+    text = _text(run_page("Dashboard.py"))
     assert "Next race" in text and "Trail Race 23km" in text
-    assert "Recovery" in text
+    assert "Recovery" in text and "Readiness" in text and "Values for" in text
+    assert "connect.garmin.com" not in text                        # links live in the table
 
 
-def test_now_page_names_a_broken_input(broken_inputs):
-    at = run_page("Now.py")
+def test_dashboard_names_a_broken_input(broken_inputs):
+    at = run_page("Dashboard.py")
     warnings = "\n".join(str(w.value) for w in at.warning)
     assert "wellness" in warnings and "plan" in warnings
+
+
+def test_dashboard_opens_a_run_on_the_activity_page(baseline):
+    at = run_page("Dashboard.py")
+    assert not at.exception and len(at.dataframe) >= 2             # this week, recent runs
 
 
 def test_trends_page_content(everything):
@@ -219,3 +227,23 @@ def test_activity_page_shows_pace_as_minutes_and_seconds(baseline):
     at = run_page("pages/2_Activity.py")
     paces = [m.value for m in at.metric if m.label == "Pace"]
     assert paces == ["5:33 /km"]                          # 40 min over 7.2 km
+
+
+def test_activity_page_shows_running_dynamics_with_the_feed(everything):
+    at = run_page("pages/2_Activity.py")
+    assert "Running dynamics" in _text(at)
+    assert "Ground contact" in _text(at) and "250 ms" in _text(at)
+    assert any("connect.garmin.com/modern/activity/111" in str(b.url)
+               for b in at.get("link_button"))
+
+
+def test_activity_page_hides_running_dynamics_without_the_feed(baseline):
+    assert "Running dynamics" not in _text(run_page("pages/2_Activity.py"))
+
+
+def test_trends_page_shows_running_dynamics_with_the_feed(everything):
+    assert "Running dynamics" in _text(run_page("pages/1_Trends.py"))
+
+
+def test_trends_page_hides_running_dynamics_without_the_feed(baseline):
+    assert "Running dynamics" not in _text(run_page("pages/1_Trends.py"))

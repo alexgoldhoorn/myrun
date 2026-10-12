@@ -12,11 +12,13 @@ from myrun.config import Config, ConfigError, load_config
 from myrun.optional import InputState
 from myrun.splits import splits
 from myrun.stravadb import StravaDbError, db_mtime, open_db
+from myrun.ui import theme
 
 
 def setup(title: str) -> Config:
     """First call of every page. Stops the page with one error if it cannot start."""
     st.set_page_config(page_title=f"myrun · {title}", layout="wide")
+    theme.apply()
     try:
         cfg = load_config()
         open_db(cfg).close()
@@ -34,7 +36,7 @@ def _mtime(path: Path | None) -> float:
 
 
 def _key(cfg: Config) -> tuple:
-    inputs = (cfg.plan_csv, cfg.race_log_csv, cfg.garmin_activities_parquet)
+    inputs = (cfg.plan_csv, cfg.race_log_csv, cfg.garmin_activities)
     return (repr(cfg), db_mtime(cfg.strava_db).timestamp(), tuple(_mtime(p) for p in inputs))
 
 

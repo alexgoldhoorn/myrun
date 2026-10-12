@@ -8,20 +8,14 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from myrun import explore, fmt
+from myrun.ui import theme
 
 
 def load_bars(weekly: pd.DataFrame) -> go.Figure:
     fig = go.Figure(go.Bar(x=weekly["week_start"], y=weekly["effort"],
                            hovertemplate="week of %{x|%d %b}<br>effort %{y:.0f}<extra></extra>"))
-    fig.update_layout(height=260, margin=dict(l=10, r=10, t=10, b=10),
-                      yaxis_title="Relative effort", xaxis_title=None)
-    return fig
-
-
-def sparkline(values: pd.Series) -> go.Figure:
-    fig = go.Figure(go.Scatter(y=list(values), mode="lines", hoverinfo="skip"))
-    fig.update_layout(height=60, margin=dict(l=0, r=0, t=0, b=0), showlegend=False,
-                      xaxis=dict(visible=False), yaxis=dict(visible=False))
+    theme.style(fig, height=260)
+    fig.update_layout(yaxis_title="Relative effort", xaxis_title=None)
     return fig
 
 
@@ -42,7 +36,7 @@ def stream_figure(streams_df: pd.DataFrame, x: str = "time",
     metrics = [(c, label) for c, label in _STREAM_METRICS
                if len(streams_df) and pd.to_numeric(streams_df[c], errors="coerce").notna().any()]
     if not metrics:
-        return go.Figure()
+        return theme.style(go.Figure())
     fig = make_subplots(rows=len(metrics), cols=1, shared_xaxes=True, vertical_spacing=0.04)
     for series, name, dash in ((streams_df, "this activity", None), (overlay, "compared", "dot")):
         if series is None or not len(series):
@@ -69,8 +63,8 @@ def stream_figure(streams_df: pd.DataFrame, x: str = "time",
                 fig.update_yaxes(tickmode="array", tickvals=vals, ticktext=text, row=row, col=1)
     fig.update_xaxes(title_text="Distance (km)" if x == "distance" else "Time (min)",
                      row=len(metrics), col=1)
-    fig.update_layout(height=200 * len(metrics) + 60, margin=dict(l=10, r=10, t=10, b=10),
-                      hovermode="x unified")
+    theme.style(fig, height=200 * len(metrics) + 60)
+    fig.update_layout(hovermode="x unified")
     return fig
 
 
@@ -79,7 +73,8 @@ def zone_bar(zones: pd.DataFrame) -> go.Figure:
     fig = go.Figure(go.Bar(x=list(zones["seconds"] / 60), y=labels, orientation="h",
                            text=[f"{p:.0f}%" for p in zones["pct"]],
                            hovertemplate="%{y}: %{x:.0f} min<extra></extra>"))
-    fig.update_layout(height=220, margin=dict(l=10, r=10, t=10, b=10), xaxis_title="Minutes")
+    theme.style(fig, height=220)
+    fig.update_layout(xaxis_title="Minutes")
     return fig
 
 
@@ -110,11 +105,33 @@ def explore_figure(df: pd.DataFrame, x: str, y: str, group: pd.Series | None = N
                 fig.add_trace(go.Scatter(x=list(ends), y=list(slope * ends + intercept),
                                          mode="lines", legendgroup=name, showlegend=False,
                                          hoverinfo="skip"))
-    fig.update_layout(height=520, margin=dict(l=10, r=10, t=10, b=10), xaxis_title=x,
-                      yaxis_title=y, showlegend=group is not None)
+    theme.style(fig, height=520)
+    fig.update_layout(xaxis_title=x, yaxis_title=y, showlegend=group is not None)
     for column, update in ((x, fig.update_xaxes), (y, fig.update_yaxes)):
         if column in fmt.PACE_COLUMNS:
             vals, text = fmt.pace_ticks(df[column])
             if vals:
                 update(tickmode="array", tickvals=vals, ticktext=text)
+    return fig
+
+
+def trend_line(df: pd.DataFrame, x: str, y: str, y_title: str) -> go.Figure:
+    fig = go.Figure(go.Scatter(x=list(df[x]), y=list(df[y]), mode="lines+markers",
+                               hovertemplate="%{x|%b %Y}<br>%{y:.1f}<extra></extra>"))
+    theme.style(fig, height=300)
+    fig.update_layout(yaxis_title=y_title, xaxis_title=None)
+    return fig
+
+
+def weekly_km_bars(weekly: pd.DataFrame) -> go.Figure:
+    """Running km per week, with the planned km as markers where a plan covers the week."""
+    fig = go.Figure(go.Bar(x=weekly["week_start"], y=weekly["run_km"], name="done",
+                           hovertemplate="week of %{x|%d %b}<br>%{y:.1f} km<extra></extra>"))
+    if "planned_km" in weekly and weekly["planned_km"].notna().any():
+        fig.add_trace(go.Scatter(x=weekly["week_start"], y=weekly["planned_km"], name="planned",
+                                 mode="markers", marker={"symbol": "line-ew-open", "size": 22,
+                                                         "line": {"width": 2}},
+                                 hovertemplate="planned %{y:.1f} km<extra></extra>"))
+    theme.style(fig, height=260)
+    fig.update_layout(yaxis_title="Running km", xaxis_title=None)
     return fig

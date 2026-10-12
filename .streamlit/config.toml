@@ -1,0 +1,33 @@
+[server]
+enableStaticServing = true
+
+[client]
+toolbarMode = "minimal"
+
+[theme]
+font = "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+headingFont = "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+baseRadius = "0.5rem"
+showSidebarBorder = true
+
+[[theme.fontFaces]]
+family = "Inter"
+url = "app/static/inter-latin-wght-normal.woff2"
+weight = "100 900"
+style = "normal"
+
+[theme.light]
+primaryColor = "#2a78d6"
+backgroundColor = "#f8f9fa"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#212529"
+borderColor = "#dee2e6"
+chartCategoricalColors = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
+
+[theme.dark]
+primaryColor = "#3987e5"
+backgroundColor = "#1a1d21"
+secondaryBackgroundColor = "#212529"
+textColor = "#e9ecef"
+borderColor = "#373b3e"
+chartCategoricalColors = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"]
