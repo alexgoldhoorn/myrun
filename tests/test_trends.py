@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 
 from myrun import trends
-from myrun.activities import activities
+from myrun.activities import activities, runs
 from tests.fixture import OLD, RACE, STEADY
 
 
@@ -50,3 +50,8 @@ def test_best_efforts_ignore_other_sports(cfg):
     ten = trends.best_efforts(cfg=cfg).query("distance_m == 10000")
     assert ten["time_s"].tolist() == [2700]          # the 1100 s ride effort is not a run
     assert ten["is_record"].tolist() == [True]
+
+
+def test_easy_runs_is_the_efficiency_filter(cfg):
+    easy = trends.easy_runs(runs(cfg=cfg), cfg)
+    assert sorted(easy["activity_id"]) == sorted([STEADY, OLD])     # in band, flat, long enough

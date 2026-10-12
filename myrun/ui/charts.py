@@ -118,3 +118,11 @@ def explore_figure(df: pd.DataFrame, x: str, y: str, group: pd.Series | None = N
             if vals:
                 update(tickmode="array", tickvals=vals, ticktext=text)
     return fig
+
+
+def trend_line(df: pd.DataFrame, x: str, y: str, y_title: str) -> go.Figure:
+    fig = go.Figure(go.Scatter(x=list(df[x]), y=list(df[y]), mode="lines+markers",
+                               hovertemplate="%{x|%b %Y}<br>%{y:.1f}<extra></extra>"))
+    fig.update_layout(height=300, margin=dict(l=10, r=10, t=10, b=10), yaxis_title=y_title,
+                      xaxis_title=None)
+    return fig

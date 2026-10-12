@@ -219,3 +219,23 @@ def test_activity_page_shows_pace_as_minutes_and_seconds(baseline):
     at = run_page("pages/2_Activity.py")
     paces = [m.value for m in at.metric if m.label == "Pace"]
     assert paces == ["5:33 /km"]                          # 40 min over 7.2 km
+
+
+def test_activity_page_shows_running_dynamics_with_the_feed(everything):
+    at = run_page("pages/2_Activity.py")
+    assert "Running dynamics" in _text(at)
+    assert any(m.label == "Ground contact" and m.value == "250 ms" for m in at.metric)
+    assert any("connect.garmin.com/modern/activity/111" in str(b.url)
+               for b in at.get("link_button"))
+
+
+def test_activity_page_hides_running_dynamics_without_the_feed(baseline):
+    assert "Running dynamics" not in _text(run_page("pages/2_Activity.py"))
+
+
+def test_trends_page_shows_running_dynamics_with_the_feed(everything):
+    assert "Running dynamics" in _text(run_page("pages/1_Trends.py"))
+
+
+def test_trends_page_hides_running_dynamics_without_the_feed(baseline):
+    assert "Running dynamics" not in _text(run_page("pages/1_Trends.py"))

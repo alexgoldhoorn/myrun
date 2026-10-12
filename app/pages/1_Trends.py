@@ -4,10 +4,10 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from myrun import fmt, optional, trends
+from myrun import dynamics, fmt, links, optional, trends
 from myrun.config import RUN_SPORTS
 from myrun.hr import hr_settings
-from myrun.ui import common
+from myrun.ui import charts, common
 
 cfg = common.setup("Trends")
 acts = common.load_activities(cfg)
@@ -71,6 +71,19 @@ else:
                         **(dict(tickmode="array", tickvals=vals, ticktext=text) if vals else {}))
     st.plotly_chart(figure)
 
+# ---- running dynamics -----------------------------------------------------
+dynamic_columns = dynamics.available(runs)
+if dynamic_columns:
+    st.subheader("Running dynamics")
+    column = st.selectbox("Metric", dynamic_columns,
+                          format_func=lambda c: dynamics.DYNAMICS[c][0])
+    trend = dynamics.dynamics_trend(column, activities=acts, cfg=cfg)
+    if trend.empty:
+        st.caption("No easy runs carry this value yet.")
+    else:
+        st.plotly_chart(charts.trend_line(trend, "month", "value", dynamics.DYNAMICS[column][0]))
+        st.caption("Monthly median on easy, flat road runs, from the first month with data.")
+
 # ---- races ----------------------------------------------------------------
 races, race_state = optional.read_races(cfg)
 if race_state.status != "off":
@@ -85,6 +98,7 @@ if race_state.status != "off":
                                 color="type" if "type" in races else None)
             figure.update_yaxes(autorange="reversed", title="Rank percentile (lower is better)")
             st.plotly_chart(figure)
+        races = links.fill_race_garmin_urls(races, acts)
         links_config = {c: st.column_config.LinkColumn(display_text="open")
                         for c in ("garmin_url", "strava_url") if c in races}
         st.dataframe(races.sort_values("date", ascending=False), hide_index=True,

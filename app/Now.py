@@ -100,13 +100,17 @@ else:
         "Avg HR": recent["avg_hr"],
         "Effort": recent["relative_effort"],
         "Strava": recent["activity_id"].map(links.strava_url),
+        "Garmin": recent["garmin_activity_id"].map(links.garmin_url)
+        if "garmin_activity_id" in recent else None,
         "Stats": recent["activity_id"].map(lambda a: links.sfs_url(cfg.sfs_url, a)),
     })
     if cfg.sfs_url is None:
         listing = listing.drop(columns="Stats")
+    if listing["Garmin"].isna().all():
+        listing = listing.drop(columns="Garmin")
     link = st.column_config.LinkColumn(display_text="open")
     picked = st.dataframe(listing, hide_index=True, on_select="rerun", selection_mode="single-row",
-                          column_config={"Strava": link, "Stats": link}, key="recent")
+                          column_config={"Strava": link, "Stats": link, "Garmin": link}, key="recent")
     if picked.selection.rows:
         st.session_state["activity_id"] = recent["activity_id"].iloc[picked.selection.rows[0]]
         st.switch_page("pages/2_Activity.py")

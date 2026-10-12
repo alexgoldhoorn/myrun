@@ -3,7 +3,8 @@
 import pandas as pd
 import streamlit as st
 
-from myrun import fmt, links, optional, streams
+from myrun import dynamics, fmt, links, optional, streams
+from myrun.config import RUN_SPORTS
 from myrun.hr import hr_settings
 from myrun.ui import charts, common
 
@@ -55,6 +56,19 @@ if stats_url:
 garmin_url = links.garmin_url(row.get("garmin_activity_id"))
 if garmin_url:
     link_slots[2].link_button("Garmin Connect", garmin_url)
+
+session = row.get("session_name")
+if isinstance(session, str) and session:
+    st.caption(f"Garmin session: {session}")
+
+runs_only = acts[acts["sport"].isin(RUN_SPORTS)]
+dynamic_cards = dynamics.activity_dynamics(row, runs_only)
+if dynamic_cards:
+    st.subheader("Running dynamics")
+    for slot, card in zip(st.columns(len(dynamic_cards)), dynamic_cards):
+        slot.metric(card.label, fmt.metric_value(card.value, card.unit),
+                    fmt.metric_delta(card.delta, card.unit) or None, delta_color="off",
+                    help=card.note)
 
 data = streams.activity_streams(activity_id, cfg=cfg)
 if data.empty:
