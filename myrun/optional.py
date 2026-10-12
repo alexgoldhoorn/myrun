@@ -19,6 +19,8 @@ from myrun.config import RUN_SPORTS, Config, load_config
 from myrun.stravadb import db_mtime
 
 WELLNESS_COLUMNS = ("readiness", "sleep_hours", "hrv_ms", "resting_hr", "body_battery", "stress")
+# Detail shown on a card, never a card or a chart of its own.
+WELLNESS_DETAIL = ("sleep_score", "deep_sleep_seconds", "rem_sleep_seconds")
 GARMIN_NUMERIC = ("ground_contact_ms", "vertical_oscillation_cm", "vertical_ratio_pct",
                   "stride_length_m", "garmin_cadence_spm", "power_w", "aerobic_te",
                   "anaerobic_te", "garmin_load", "vo2max")
@@ -99,7 +101,7 @@ def read_wellness(cfg: Config, now: float | None = None):
     df = df.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
     if df.empty:
         return _error(name, f"{path.name} has no rows with a readable date")
-    for column in present:
+    for column in (*present, *(c for c in WELLNESS_DETAIL if c in df.columns)):
         df[column] = pd.to_numeric(df[column], errors="coerce").astype("float64")
     return df, _file_state(name, path, cfg, now)
 

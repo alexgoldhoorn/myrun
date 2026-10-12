@@ -108,3 +108,13 @@ def test_intensity_bars_stack_three_named_series_without_own_colours():
     assert [t.name for t in fig.data] == ["easy", "steady", "hard"]
     assert fig.layout.barmode == "stack"
     assert all(t.marker.color is None for t in fig.data)
+
+
+def test_easy_pace_line_reads_as_pace_with_faster_at_the_top():
+    weekly = pd.DataFrame({"week_start": pd.to_datetime(["2026-09-21", "2026-09-28", "2026-10-05"]),
+                           "easy_pace_min_km": [5.75, float("nan"), 5.5]})
+    fig = charts.easy_pace_line(weekly)
+    assert list(fig.data[0].y) == [5.75, 5.5]                   # weeks without an easy run left out
+    assert fig.layout.yaxis.autorange == "reversed"
+    assert "5:30" in list(fig.layout.yaxis.ticktext)
+    assert fig.data[0].line.color is None

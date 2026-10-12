@@ -41,3 +41,24 @@ def test_sparkline_needs_two_points_and_survives_a_flat_series():
 def test_row_wraps_every_card():
     html = cards.row_html([Metric("a", "A", 1.0, None, "km"), Metric("b", "B", 2.0, None, "km")])
     assert html.startswith('<div class="mr-row">') and html.count('class="mr-card"') == 2
+
+
+def test_calendar_is_one_square_per_day_with_escaped_tooltips_and_blank_future_days():
+    import pandas as pd
+    days = pd.DataFrame({"date": pd.date_range("2026-09-28", periods=14),
+                         "minutes": [0.0, 30.0, 95.0] + [0.0] * 8 + [float("nan")] * 3})
+    html = cards.calendar_html(days)
+    assert html.count('class="mr-day') == 14
+    assert html.count("mr-day-future") == 3 and html.count("mr-day-0") == 9
+    assert 'title="Tue 29 Sep: 30 min"' in html and "mr-day-3" in html     # 95 min: top level
+    assert cards.calendar_html(days.iloc[0:0]) == ""
+
+
+def test_readiness_strip_escapes_names():
+    html = cards.readiness_html({"race": "Autumn <Half>", "days_to_go": 20, "weeks": 8, "km": 104.0,
+                                 "longest_km": 24.0,
+                                 "previous": {"name": "Spring & Half", "date": __import__("pandas").Timestamp("2026-06-27"),
+                                              "km": 24.0, "longest_km": 8.0}})
+    assert "Autumn &lt;Half&gt;" in html and "Spring &amp; Half" in html
+    assert "104 km" in html and "longest 24 km" in html and "<Half>" not in html
+    assert cards.readiness_html(None) == ""

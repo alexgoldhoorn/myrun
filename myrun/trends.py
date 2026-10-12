@@ -13,6 +13,7 @@ from myrun.stravadb import open_db
 
 _FREQ = {"week": "W-SUN", "month": "M", "year": "Y"}
 MIN_EFFICIENCY_MINUTES = 20
+SHOE_LIMIT_KM = 700
 
 
 def volume(by: str = "month", *, activities: pd.DataFrame | None = None,
@@ -63,6 +64,31 @@ def best_efforts(distances=(1000, 5000, 10000, 21097), *, cfg: Config | None = N
     df["pace_min_km"] = df["time_s"] / 60 / (df["distance_m"] / 1000)
     df["is_record"] = df["time_s"] == df.groupby("distance_m")["time_s"].cummin()
     return df[["activity_id", "date", "distance_m", "time_s", "pace_min_km", "is_record"]]
+
+
+def shoes(*, cfg: Config | None = None) -> pd.DataFrame:
+    """Running distance per shoe: name, km, runs, last_used, retired. In use first.
+
+    Empty when the database has no gear (an older statistics-for-strava, or none assigned)."""
+    cfg = cfg or load_config()
+    columns = ["name", "km", "runs", "last_used", "retired"]
+    marks = ",".join("?" for _ in RUN_SPORTS)
+    try:
+        with closing(open_db(cfg)) as conn:
+            df = pd.read_sql_query(
+                f"""SELECT g.name AS name, SUM(a.distance) / 1000.0 AS km, COUNT(*) AS runs,
+                           MAX(a.startDateTime) AS last_used, COALESCE(g.isRetired, 0) AS retired
+                    FROM Activity a JOIN Gear g ON g.gearId = a.gearId
+                    WHERE COALESCE(a.markedForDeletion, 0) != 1 AND a.sportType IN ({marks})
+                    GROUP BY g.gearId ORDER BY retired, km DESC""",
+                conn, params=list(RUN_SPORTS))
+    except Exception as exc:
+        if "no such" not in str(exc):      # anything but a missing Gear table or gearId column
+            raise
+        return pd.DataFrame(columns=columns)
+    df["last_used"] = pd.to_datetime(df["last_used"]).dt.normalize()
+    df["retired"] = df["retired"].astype(bool)
+    return df[columns]
 
 
 def easy_runs(activities: pd.DataFrame, cfg: Config) -> pd.DataFrame:

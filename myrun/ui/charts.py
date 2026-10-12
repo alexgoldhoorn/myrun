@@ -147,3 +147,18 @@ def intensity_bars(weekly: pd.DataFrame) -> go.Figure:
     theme.style(fig, height=300)
     fig.update_layout(barmode="stack", yaxis_title="Running minutes", xaxis_title=None)
     return fig
+
+
+def easy_pace_line(weekly: pd.DataFrame) -> go.Figure:
+    """Median easy pace per week; weeks without an easy run are left out, faster is up."""
+    shown = weekly.dropna(subset=["easy_pace_min_km"])
+    fig = go.Figure(go.Scatter(x=list(shown["week_start"]), y=list(shown["easy_pace_min_km"]),
+                               mode="lines+markers",
+                               text=[fmt.pace(v) for v in shown["easy_pace_min_km"]],
+                               hovertemplate="week of %{x|%d %b}<br>%{text} /km<extra></extra>"))
+    theme.style(fig, height=260)
+    vals, text = fmt.pace_ticks(shown["easy_pace_min_km"])
+    fig.update_layout(yaxis_title="Easy pace (min/km)", xaxis_title=None)
+    fig.update_yaxes(autorange="reversed",
+                     **(dict(tickmode="array", tickvals=vals, ticktext=text) if vals else {}))
+    return fig

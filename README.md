@@ -7,9 +7,11 @@ statistics-for-strava for everything else.
 
 - **Dashboard**: cards for volume (with the share of the plan done), load and fitness
   (with VO2max and the easy share of running time, from the Garmin input), and recovery,
-  each against the period before; weekly load and weekly kilometres against the plan; this week's
+  each against the period before; a consistency row with the run streak and a 12-week
+  calendar of training days; the build-up to the next race against the same point
+  before the last similar one; weekly load and weekly kilometres against the plan; this week's
   sessions; recent runs.
-- **Trends**: aerobic efficiency, volume, best efforts, races, and running dynamics
+- **Trends**: aerobic efficiency, volume, best efforts, shoe mileage, races, and running dynamics
   over time when the Garmin input is set.
 - **Activity**: heart rate, pace, elevation and cadence over one run, time in zones,
   heart-rate drift, laps, an overlay with another run, and the run's running dynamics
@@ -29,7 +31,7 @@ Four more inputs are optional. Leave one out and its panels disappear.
 
 | Input | Format | Columns |
 |---|---|---|
-| Wellness | Parquet, one row per day | `date`, and any of `readiness`, `sleep_hours`, `hrv_ms`, `resting_hr`, `body_battery`, `stress`; other names can be mapped in the config |
+| Wellness | Parquet, one row per day | `date`, and any of `readiness`, `sleep_hours`, `hrv_ms`, `resting_hr`, `body_battery`, `stress`, and as card detail `sleep_score`, `deep_sleep_seconds`, `rem_sleep_seconds`, `hrv_status`; other names can be mapped in the config |
 | Plan | CSV | `date` (ISO), `session`, `type` (for example `easy`, `tempo`, `intervals`, `long`, `race`, `rest`), `distance_km` |
 | Race log | CSV with your own headers, mapped in the config | at least a name and a date; optionally type, distance, official time, rank percentile, links |
 | Garmin activities | CSV or Parquet, one row per activity | `start` (local time), and any of `garmin_activity_id`, `session_name`, `session_type`, `ground_contact_ms`, `vertical_oscillation_cm`, `vertical_ratio_pct`, `stride_length_m`, `garmin_cadence_spm`, `power_w`, `aerobic_te`, `anaerobic_te`, `garmin_load`, `vo2max` |

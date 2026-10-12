@@ -55,3 +55,23 @@ def test_best_efforts_ignore_other_sports(cfg):
 def test_easy_runs_is_the_efficiency_filter(cfg):
     easy = trends.easy_runs(runs(cfg=cfg), cfg)
     assert sorted(easy["activity_id"]) == sorted([STEADY, OLD])     # in band, flat, long enough
+
+
+def test_shoes_table_and_a_database_without_gear(cfg):
+    assert trends.shoes(cfg=cfg).empty                         # the fixture has no Gear table
+    import sqlite3
+    conn = sqlite3.connect(cfg.strava_db)
+    conn.executescript("""
+        CREATE TABLE Gear (gearId VARCHAR(255), name VARCHAR(255), isRetired BOOLEAN);
+        ALTER TABLE Activity ADD COLUMN gearId VARCHAR(255);
+        INSERT INTO Gear VALUES ('g1', 'Road <shoe>', 0), ('g2', 'Old pair', 1), ('g3', 'Bike', 0);
+    """)
+    conn.execute("UPDATE Activity SET gearId = 'g1' WHERE activityId IN (?, ?)", (STEADY, OLD))
+    conn.execute("UPDATE Activity SET gearId = 'g2' WHERE activityId = ?", (RACE,))
+    conn.commit()
+    conn.close()
+    shoes = trends.shoes(cfg=cfg)
+    assert list(shoes.columns) == ["name", "km", "runs", "last_used", "retired"]
+    assert shoes["name"].tolist() == ["Road <shoe>", "Old pair"]          # in use first; no bike
+    assert shoes["km"].tolist() == pytest.approx([17.2, 10.0]) and shoes["runs"].tolist() == [2, 1]
+    assert shoes["retired"].tolist() == [False, True]

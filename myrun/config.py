@@ -49,7 +49,8 @@ _THRESHOLDS = {"mixed_hilliness_m_per_km", "efficiency_max_hilliness_m_per_km",
                "grade_class_m_per_km", "load_bands", "stale_hours", "garmin_join_tolerance_s"}
 
 WELLNESS_FIELDS = ("date", "readiness", "sleep_hours", "sleep_seconds", "hrv_ms", "resting_hr",
-                   "body_battery", "stress")
+                   "body_battery", "stress", "sleep_score", "deep_sleep_seconds",
+                   "rem_sleep_seconds", "hrv_status")
 
 
 def _path(value) -> Path | None:

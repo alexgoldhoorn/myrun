@@ -47,7 +47,9 @@ def test_year_to_date_on_new_years_day_and_leap_day(cfg):
 
 
 def test_fitness_cards(cfg):
-    fitness = by_key(metrics.headline(today=TODAY, cfg=cfg)["fitness"])
+    numbers = metrics.headline(today=TODAY, cfg=cfg)
+    fitness = by_key(numbers["fitness"] + numbers["volume"])
+    assert [m.key for m in numbers["volume"]][-2:] == ["longest_run", "runs_per_week"]
     assert fitness["load_ratio"].value == pytest.approx(135 / (345 / 4))
     assert fitness["load_ratio"].detail == "very high" and fitness["load_ratio"].tone == "bad"
     assert fitness["longest_run"].value == pytest.approx(15.0)
@@ -62,7 +64,8 @@ def test_fitness_cards(cfg):
 
 
 def test_easy_pace_without_qualifying_runs_says_why(cfg):
-    fitness = by_key(metrics.headline(today="2019-06-01", cfg=cfg)["fitness"])
+    numbers = metrics.headline(today="2019-06-01", cfg=cfg)
+    fitness = by_key(numbers["fitness"] + numbers["volume"])
     assert fitness["easy_pace"].value is None
     assert fitness["easy_pace"].note == "no easy road runs in the last 4 weeks"
     assert fitness["load_ratio"].value is None and fitness["load_ratio"].detail == "no data"
@@ -240,6 +243,122 @@ def test_body_battery_and_stress_join_the_recovery_row(cfg, tmp_path):
 def test_headline_places_the_new_cards(cfg, tmp_path):
     c = replace(cfg, plan_csv=write_plan(tmp_path / "plan.csv"))
     numbers = metrics.headline(today=TODAY, cfg=c)
-    assert [m.key for m in numbers["volume"]][-1] == "plan_done"
+    assert [m.key for m in numbers["consistency"]] == ["plan_done", "run_streak"]
     assert "vo2max" not in [m.key for m in numbers["fitness"]]      # no Garmin input here
-    assert "plan_done" not in [m.key for m in metrics.headline(today=TODAY, cfg=cfg)["volume"]]
+    assert [m.key for m in metrics.headline(today=TODAY, cfg=cfg)["consistency"]] == ["run_streak"]
+
+
+# ---- third round: Garmin load, heat note, streak, calendar, race readiness, sleep detail ----
+
+def test_garmin_load_card_uses_the_same_bands_as_the_strava_one(cfg):
+    acts = _runs([(1, 8, 45, None, None, None), (3, 8, 45, None, None, None),
+                  (10, 8, 45, None, None, None), (20, 8, 45, None, None, None)])
+    acts["garmin_load"] = [100.0, 100.0, 50.0, 50.0]
+    card = metrics.garmin_load_card(acts, NOW, cfg)
+    assert card.key == "garmin_load_ratio" and card.unit == "ratio"
+    assert card.value == pytest.approx(200 / (300 / 4))       # 2.67: far above the bands
+    assert card.detail == "very high" and card.tone == "bad"
+    assert metrics.garmin_load_card(acts.drop(columns="garmin_load"), NOW, cfg) is None
+
+
+def _easy(rows):
+    """rows: (days ago, pace, temperature)"""
+    return pd.DataFrame({"date": [NOW - pd.Timedelta(days=d) for d, _, _ in rows],
+                         "pace_min_km": [p for _, p, _ in rows], "temp_c": [c for _, _, c in rows]})
+
+
+def test_a_slower_easy_pace_in_warmer_weather_is_not_coloured_as_lost_fitness():
+    card = metrics.easy_pace_card(_easy([(2, 6.0, 24.0), (5, 6.0, 26.0), (35, 5.5, 14.0)]), (), NOW)
+    assert card.value == 6.0 and card.previous == 5.5
+    assert card.tone == "neutral"
+    assert card.note == "slower, but 11 °C warmer than the previous 4 weeks"
+
+
+def test_a_slower_easy_pace_in_the_same_weather_stays_red():
+    card = metrics.easy_pace_card(_easy([(2, 6.0, 15.0), (35, 5.5, 14.0)]), (), NOW)
+    assert card.tone == "bad" and card.note == "vs previous 4 weeks, easy road runs"
+
+
+def test_a_faster_easy_pace_in_cooler_weather_is_not_coloured_as_gained_fitness():
+    card = metrics.easy_pace_card(_easy([(2, 5.0, 8.0), (35, 5.5, 20.0)]), (), NOW)
+    assert card.tone == "neutral"
+    assert card.note == "faster, but 12 °C cooler than the previous 4 weeks"
+
+
+def _days(days_ago):
+    return _runs([(d, 5, 30, None, None, None) for d in days_ago])
+
+
+def test_run_streak_counts_weeks_in_a_row_with_three_runs():
+    # TODAY is a Monday: this week has one run so far and neither counts nor breaks the streak.
+    runs = _days([0, 1, 2, 3, 8, 9, 10, 15, 16, 17, 22, 23])   # 3, 3, 3, then a week with 2
+    card = metrics.streak_card(runs, NOW)
+    assert (card.key, card.unit, card.value) == ("run_streak", "weeks", 3.0)
+    assert card.note == "weeks in a row with 3 or more runs"
+    assert card.detail == "1 this week"
+
+
+def test_run_streak_includes_the_current_week_once_it_qualifies():
+    wednesday = NOW + pd.Timedelta(days=2)
+    runs = _days([0, 1, 2, 3])                                  # relative to Monday: Mon + 3 last week
+    runs = pd.concat([runs, runs.assign(date=[wednesday, wednesday - pd.Timedelta(days=1),
+                                               wednesday - pd.Timedelta(days=1), wednesday])],
+                     ignore_index=True)
+    assert metrics.streak_card(runs, wednesday).value == 2.0     # this week (3+) and last week (3)
+    assert metrics.streak_card(_days([40]), NOW).value == 0.0
+
+
+def test_training_days_cover_whole_weeks_and_leave_the_future_blank():
+    acts = _runs([(0, 5, 30, None, None, None), (0, 0, 20, None, None, None),
+                  (8, 5, 45, None, None, None)])
+    days = metrics.training_days(2, activities=acts, today=TODAY)
+    assert list(days.columns) == ["date", "minutes"] and len(days) == 14
+    assert days["date"].iloc[0] == NOW - pd.Timedelta(days=7)    # Monday of last week
+    by_date = days.set_index("date")["minutes"]
+    assert by_date[NOW] == 50.0 and by_date[NOW - pd.Timedelta(days=6)] == 0.0
+    assert pd.isna(by_date[NOW + pd.Timedelta(days=1)])          # tomorrow has not happened
+
+
+def _race_runs():
+    rows = [(d, 10, 60, None, None, None) for d in (3, 10, 17, 24, 31, 38, 45, 52)]   # build-up now
+    rows += [(5, 24, 150, None, None, None)]                                          # long run
+    rows += [(100, 21, 110, None, None, None)]                                        # previous race
+    rows += [(100 + 20 + d, 8, 50, None, None, None) for d in (3, 10, 17)]            # its build-up
+    runs = _runs(rows)
+    runs["session_type"] = None
+    runs["race_name"] = None
+    runs.loc[9, ["session_type", "race_name"]] = ["race", "Spring Half <1>"]
+    return runs
+
+
+def test_race_readiness_compares_the_build_up_with_the_same_point_before_the_last_similar_race():
+    plan = pd.DataFrame({"date": [NOW + pd.Timedelta(days=20)], "type": ["race"],
+                         "session": ["Autumn Half"], "distance_km": [21.1]})
+    ready = metrics.race_readiness(_race_runs(), plan, NOW)
+    assert ready["race"] == "Autumn Half" and ready["days_to_go"] == 20
+    assert ready["km"] == pytest.approx(104.0) and ready["longest_km"] == pytest.approx(24.0)
+    assert ready["previous"]["name"] == "Spring Half <1>"
+    assert ready["previous"]["km"] == pytest.approx(24.0)       # three 8 km runs, same point
+    assert ready["previous"]["longest_km"] == pytest.approx(8.0)
+
+
+def test_race_readiness_without_a_similar_earlier_race_or_without_a_race():
+    marathon = pd.DataFrame({"date": [NOW + pd.Timedelta(days=20)], "type": ["race"],
+                             "session": ["Marathon"], "distance_km": [42.2]})
+    assert metrics.race_readiness(_race_runs(), marathon, NOW)["previous"] is None
+    none = pd.DataFrame({"date": [NOW - pd.Timedelta(days=2)], "type": ["race"],
+                         "session": ["Past"], "distance_km": [10.0]})
+    assert metrics.race_readiness(_race_runs(), none, NOW) is None
+    assert metrics.race_readiness(_race_runs(), None, NOW) is None
+
+
+def test_sleep_and_hrv_cards_carry_garmin_detail(cfg, tmp_path):
+    path = tmp_path / "w.parquet"
+    dates = pd.date_range(end=pd.Timestamp(TODAY), periods=30)
+    pd.DataFrame({"date": dates, "sleep_hours": 7.0, "hrv_ms": 50.0, "sleep_score": 82.0,
+                  "deep_sleep_seconds": 4320.0, "rem_sleep_seconds": 5400.0,
+                  "hrv_status": ["BALANCED"] * 29 + ["UNBALANCED"]}).to_parquet(path)
+    recovery = by_key(metrics.headline(today=TODAY, cfg=replace(cfg, wellness_parquet=path))["recovery"])
+    assert list(recovery) == ["hrv_ms", "sleep_hours"]
+    assert recovery["sleep_hours"].detail == "score 82, deep 1.2 h, REM 1.5 h"
+    assert recovery["hrv_ms"].detail == "unbalanced"
