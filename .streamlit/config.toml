@@ -2,7 +2,8 @@
 enableStaticServing = true
 
 [client]
-toolbarMode = "minimal"
+# "viewer" keeps the menu at the top right: Settings there switches light and dark
+toolbarMode = "viewer"
 
 [theme]
 font = "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
