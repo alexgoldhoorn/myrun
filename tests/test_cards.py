@@ -82,3 +82,12 @@ def test_summary_cards_show_a_label_and_the_whole_value():
     assert html.count("mr-card mr-compact") == 2
     assert '<div class="mr-value">12.34 km</div>' in html
     assert cards.summary_html([]) == ""
+
+
+def test_calendar_marks_an_activity_without_a_duration_as_trained():
+    import pandas as pd
+    days = pd.DataFrame({"date": pd.date_range("2026-09-28", periods=2), "minutes": [0.0, 0.0],
+                         "activities": [1, 0]})
+    html = cards.calendar_html(days)
+    assert 'mr-day-1" title="Mon 28 Sep: activity, length unknown"' in html
+    assert 'mr-day-0" title="Tue 29 Sep: rest"' in html

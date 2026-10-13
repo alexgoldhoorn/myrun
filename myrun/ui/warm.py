@@ -18,7 +18,7 @@ import threading
 from myrun.config import Config, load_config
 from myrun.ui import common
 
-INTERVAL_S = 240        # under common.CACHE_TTL_S, so timed results never expire unwarmed
+INTERVAL_S = 240        # under common.CACHE_TTL_S; each cycle recomputes the timed results
 # The calls the pages make with their default choices: (name, *arguments).
 WARM = (("input_states",), ("plan",), ("wellness",), ("races",), ("hr_settings",), ("headline",),
         ("weekly_load", 12), ("weekly_runs", 12), ("plan_vs_actual",), ("efficiency",),
@@ -28,9 +28,15 @@ WARM = (("input_states",), ("plan",), ("wellness",), ("races",), ("hr_settings",
 log = logging.getLogger("myrun.warm")
 
 
-def warm(cfg: Config) -> dict[str, list[str]]:
-    """Fill the cache for every default page call. Never raises: failures are reported."""
+def warm(cfg: Config, refresh: bool = False) -> dict[str, list[str]]:
+    """Fill the cache for every default page call. Never raises: failures are reported.
+
+    With refresh, the timed results are dropped first and so computed again. Their expiry
+    counts from when they were stored, not last read: without this they would run out
+    between two cycles and the next visitor would pay for them."""
     warmed, failed = [], []
+    if refresh:
+        common.drop_clocked()
     steps = [("activities", lambda: common.load_activities(cfg))]
     steps += [(call[0], lambda call=call: common.cached(call[0], cfg, *call[1:])) for call in WARM]
     steps.append(("splits", lambda: common.load_splits(cfg)))
@@ -53,7 +59,7 @@ def loop(load=load_config, stop: threading.Event | None = None,
     while not stop.is_set():
         try:
             cfg = load()
-            report = warm(cfg)
+            report = warm(cfg, refresh=True)
             key = common._key(cfg)
             if key != last_key:                      # say so once per change, not per cycle
                 log.warning("cache warmed (%d results, %d failed)", len(report["warmed"]),

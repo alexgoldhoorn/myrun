@@ -95,8 +95,11 @@ def calendar_html(days) -> str:
         if row.minutes != row.minutes:                       # NaN: a future day
             squares.append('<span class="mr-day mr-day-future"></span>')
             continue
-        level = 0 if row.minutes <= 0 else 1 + sum(row.minutes >= edge for edge in _DAY_LEVELS)
-        text = "rest" if level == 0 else f"{row.minutes:.0f} min"
+        unknown = row.minutes <= 0 and getattr(row, "activities", 0) > 0
+        level = 1 if unknown else 0 if row.minutes <= 0 else 1 + sum(
+            row.minutes >= edge for edge in _DAY_LEVELS)
+        text = ("activity, length unknown" if unknown else "rest" if level == 0
+                else f"{row.minutes:.0f} min")
         squares.append(f'<span class="mr-day mr-day-{level}" '
                        f'title="{escape(f"{row.date:%a %d %b}: {text}")}"></span>')
     return f'<div class="mr-cal">{"".join(squares)}</div>'

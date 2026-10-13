@@ -128,6 +128,11 @@ def _cached_clocked(name: str, _cfg: Config, key: tuple, args: tuple):
     return COMPUTE[name](_cfg, *args)
 
 
+def drop_clocked() -> None:
+    """Forget the timed results, so the next call computes them. For the warm-up."""
+    _cached_clocked.clear()
+
+
 def cached(name: str, cfg: Config, *args):
     """COMPUTE[name](cfg, *args), computed once until an input file or the day changes."""
     if name not in COMPUTE:
