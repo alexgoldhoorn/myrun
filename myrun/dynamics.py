@@ -18,7 +18,7 @@ DYNAMICS: dict[str, tuple[str, str]] = {
     "power_w": ("Power", "w"),
     "aerobic_te": ("Aerobic training effect", "te"),
 }
-BASELINE_DAYS = 90
+BASELINE_DAYS = 90             # chosen: a run's dynamics are compared with this many earlier days
 
 
 def available(activities: pd.DataFrame) -> list[str]:

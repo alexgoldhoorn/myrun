@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
+import numpy as np
 import pandas as pd
 
 from myrun.activities import activities as _load
@@ -13,11 +14,14 @@ from myrun.metric import Metric, clean
 from myrun.optional import NON_RUN_PLAN_TYPES, read_plan, read_wellness
 from myrun.trends import easy_runs
 
-TREND_WEEKS = 12
-RECOVERY_DAYS = 14
-MIN_PLAN_DAYS = 7              # Plan done needs this many days covered by the plan
-FEED_LAG_DAYS = 1              # days of activities without a Garmin load before the card says so
-TONE_TOLERANCE = 0.05          # a change under 5 % is not coloured
+# Thresholds. Each says where its value comes from: "confirmed" by the owner, "Garmin" for
+# Garmin's own scale, "fitted" from the data at run time, or "chosen": a judgement call that
+# no data backs, to be changed here when it reads wrong on the dashboard.
+TREND_WEEKS = 12               # chosen: weeks in a card's trend line and in the weekly charts
+RECOVERY_DAYS = 14             # chosen: days in a recovery card's trend line
+MIN_PLAN_DAYS = 7              # chosen: Plan done needs this many days covered by the plan
+FEED_LAG_DAYS = 1              # chosen: days of activities without a Garmin load before the card says so
+TONE_TOLERANCE = 0.05          # chosen: a change under 5 % is not coloured
 _LOAD_TONES = {"low": "warn", "steady": "good", "high": "warn", "very high": "bad",
                "no data": "neutral"}
 # column: (label, unit, higher is better)
@@ -29,18 +33,22 @@ _RECOVERY = {
     "body_battery": ("Body battery", "score", True),
     "stress": ("Stress", "score", False),
 }
-VO2MAX_STEP = 1.0              # Garmin reports whole numbers: one point is a real change
-STEADY_AEROBIC_TE = 3.0        # Garmin training effect 3.0-3.9 "improving"
-HARD_AEROBIC_TE = 4.0          # 4.0 and up "highly improving"
-HARD_ANAEROBIC_TE = 2.0        # 2.0 and up: the session had real anaerobic work
+VO2MAX_STEP = 1.0              # Garmin: it reports whole numbers, so one point is a real change
+STEADY_AEROBIC_TE = 3.0        # Garmin: training effect 3.0-3.9 is "improving"
+HARD_AEROBIC_TE = 4.0          # Garmin: 4.0 and up is "highly improving"
+HARD_ANAEROBIC_TE = 2.0        # Garmin: 2.0 and up, the session had real anaerobic work
 INTENSITIES = ("easy", "steady", "hard")
-HEAT_SHIFT_C = 3.0             # a 4-week median this much warmer or cooler explains a pace change
-STREAK_RUNS = 3                # runs that make a week count towards the streak
+# What a degree of warmth costs in easy pace is fitted from the runner's own easy runs
+# (heat_cost), not assumed: a fixed "3 °C explains it" rule did not hold on real data.
+HEAT_FIT_DAYS = 730            # chosen: two full years, so every season counts twice
+HEAT_MIN_RUNS = 30             # chosen: fewer easy runs with a temperature give no usable fit
+STREAK_RUNS = 3                # confirmed: runs that make a week count towards the streak
+# chosen, after the owner said the build-up depends on the distance:
 BUILD_WEEKS = ((15.0, 6), (30.0, 8), (float("inf"), 12))   # race km below -> build-up weeks compared
-DEFAULT_BUILD_WEEKS = 8        # when the race distance is unknown
-ROAD_RACE_SHARE = 0.05         # road: an earlier road race within 5 % of the distance is "similar"
-ROAD_RACE_CLIMB_M = 100.0      # ... and within this much climb, when the coming race's climb is known
-TRAIL_RACE_SHARE = 0.25        # trail: within 25 % of the distance, and of the climb when known
+DEFAULT_BUILD_WEEKS = 8        # chosen: when the race distance is unknown
+ROAD_RACE_SHARE = 0.05         # confirmed ("very close"): an earlier road race within 5 % of the distance
+ROAD_RACE_CLIMB_M = 100.0      # confirmed: ... and within 100 m of climb, when the coming race's is known
+TRAIL_RACE_SHARE = 0.25        # confirmed (10-25 %): trail, within 25 % of distance and of climb when known
 
 
 def _now(today) -> pd.Timestamp:
@@ -262,11 +270,27 @@ def garmin_load_card(acts: pd.DataFrame, now: pd.Timestamp, cfg: Config) -> Metr
                   else "no Garmin load in the last 4 weeks", detail=status["label"])
 
 
+def heat_cost(easy: pd.DataFrame, now: pd.Timestamp) -> float | None:
+    """Minutes per km that one °C of warmth costs this runner at easy effort.
+
+    A straight-line fit of pace on temperature over the easy runs of the last HEAT_FIT_DAYS.
+    None without HEAT_MIN_RUNS runs at different temperatures. Never below zero: a fit that
+    says heat makes the runner faster is noise."""
+    if "temp_c" not in easy.columns:
+        return None
+    runs = _last(easy, now, HEAT_FIT_DAYS).dropna(subset=["temp_c", "pace_min_km"])
+    if len(runs) < HEAT_MIN_RUNS or runs["temp_c"].nunique() < 2:
+        return None
+    slope = np.polyfit(runs["temp_c"].astype(float), runs["pace_min_km"].astype(float), 1)[0]
+    return max(0.0, float(slope))
+
+
 def easy_pace_card(easy: pd.DataFrame, series: tuple[float, ...], now: pd.Timestamp) -> Metric:
     """Median pace of easy runs, last 4 weeks against the 4 before.
 
-    A change that goes with the weather (slower and clearly warmer, or faster and clearly
-    cooler) is said in the note and not coloured: heat costs pace at the same effort."""
+    A change the weather accounts for is said in the note and not coloured: when the pace
+    with the fitted cost of the temperature change taken out (heat_cost) is within the
+    tolerance of the earlier pace."""
     recent, before = _last(easy, now), _last(easy, now - pd.Timedelta(days=28))
     pace = clean(recent["pace_min_km"].median()) if len(recent) else None
     pace_before = clean(before["pace_min_km"].median()) if len(before) else None
@@ -274,9 +298,11 @@ def easy_pace_card(easy: pd.DataFrame, series: tuple[float, ...], now: pd.Timest
         return Metric("easy_pace", "Easy pace", None, pace_before, "pace", series,
                       note="no easy road runs in the last 4 weeks")
     tone, note = _tone(pace, pace_before, higher_is_better=False), "vs previous 4 weeks, easy road runs"
-    if "temp_c" in easy.columns and tone != "neutral":
+    cost = heat_cost(easy, now) if tone != "neutral" else None
+    if cost:
         warmer = clean(recent["temp_c"].median() - before["temp_c"].median())
-        if warmer is not None and abs(warmer) >= HEAT_SHIFT_C and (warmer > 0) == (tone == "bad"):
+        if warmer is not None and (warmer > 0) == (tone == "bad") and _tone(
+                pace - cost * warmer, pace_before, higher_is_better=False) == "neutral":
             note = (f"{'slower' if tone == 'bad' else 'faster'}, but {abs(warmer):.0f} °C "
                     f"{'warmer' if warmer > 0 else 'cooler'} than the previous 4 weeks")
             tone = "neutral"
