@@ -292,3 +292,20 @@ def test_dashboard_third_round_without_optional_inputs(baseline):
     text = _text(run_page("Dashboard.py"))
     assert "Weeks in a row" in text and "Training days" in text
     assert "Garmin load" not in text and "Race build-up" not in text
+
+
+def test_explore_builds_its_chart_once_per_choice(baseline, monkeypatch):
+    from myrun.ui import charts
+    built, real = [], charts.explore_figure
+
+    def counting(*args, **kwargs):
+        built.append(args[1:3])
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(charts, "explore_figure", counting)
+    at = run_page("pages/3_Explore.py")
+    at.run()                                         # a rerun with the same choices
+    assert not at.exception and len(built) == 1
+    at.selectbox[1].set_value("distance_km").run()   # another Y axis is another chart
+    assert not at.exception and len(built) == 2
+    assert "rows have both values" in _text(at)

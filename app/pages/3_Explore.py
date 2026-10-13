@@ -67,22 +67,28 @@ with st.expander("Block sizes"):
         "hilliness_band": d.number_input("Hilliness (m/km)", 1, 100, 10),
     }
 
-plot = df.copy()
-if x_choice.startswith("category: "):
-    plot["_x"] = explore.group_series(plot, x_choice.removeprefix("category: "), **blocks)
-    x_column = "_x"
-else:
-    x_column = x_choice
-group = explore.group_series(plot, group_choice, **blocks)
+def _chart():
+    """The figure and how many rows it shows; built once per set of choices."""
+    plot = df.copy()
+    if x_choice.startswith("category: "):
+        plot["_x"] = explore.group_series(plot, x_choice.removeprefix("category: "), **blocks)
+        x_column = "_x"
+    else:
+        x_column = x_choice
+    group = explore.group_series(plot, group_choice, **blocks)
+    figure = charts.explore_figure(plot, x_column, y_choice, group)
+    figure.update_layout(xaxis_title=x_choice.removeprefix("category: "))
+    if x_column == "_x":
+        figure.update_xaxes(categoryorder="array", categoryarray=explore.ordered(plot["_x"]))
+    return figure, len(plot[[x_column, y_choice]].dropna()), len(plot)
 
-figure = charts.explore_figure(plot, x_column, y_choice, group)
-figure.update_layout(xaxis_title=x_choice.removeprefix("category: "))
-if x_column == "_x":
-    figure.update_xaxes(categoryorder="array", categoryarray=explore.ordered(plot["_x"]))
+
+figure, shown, total = common.figure(
+    "explore", cfg, _chart, level, tuple(str(day) for day in period), tuple(chosen_sports),
+    tuple(chosen_types), x_choice, y_choice, group_choice, tuple(sorted(blocks.items())))
 st.plotly_chart(figure)
 
-shown = plot[[x_column, y_choice]].dropna()
-st.caption(f"{len(shown)} of {len(plot)} rows have both values. "
+st.caption(f"{shown} of {total} rows have both values. "
            + ("One point per kilometre." if level == "per km" else "One point per activity."))
 if level == "per run" and not session_types:
     st.caption("No session types are available, so easy runs and hard sessions are mixed. "

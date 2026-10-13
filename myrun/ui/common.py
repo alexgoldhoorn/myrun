@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from myrun import dynamics, metrics, optional, streams, trends
+from myrun import dynamics, links, metrics, optional, streams, trends
 from myrun.activities import activities
 from myrun.config import RUN_SPORTS, Config, ConfigError, load_config
 from myrun.hr import hr_settings
@@ -80,6 +80,17 @@ def _runs_only(acts: pd.DataFrame) -> pd.DataFrame:
     return acts[acts["sport"].isin(RUN_SPORTS)]
 
 
+def _activity_dynamics(cfg: Config, activity_id: str) -> list:
+    acts = load_activities(cfg)
+    return dynamics.activity_dynamics(acts.set_index("activity_id").loc[activity_id],
+                                      _runs_only(acts))
+
+
+def _races_linked(cfg: Config) -> pd.DataFrame | None:
+    races = optional.read_races(cfg)[0]
+    return None if races is None else links.fill_race_garmin_urls(races, load_activities(cfg))
+
+
 # Every table and number a page shows, by name. Each takes the config and plain arguments,
 # so one cache covers them all and a rerun (a widget click, another visitor) computes nothing.
 COMPUTE = {
@@ -87,6 +98,7 @@ COMPUTE = {
     "plan": lambda cfg: optional.read_plan(cfg),
     "wellness": lambda cfg: optional.read_wellness(cfg),
     "races": lambda cfg: optional.read_races(cfg),
+    "races_linked": _races_linked,
     "hr_settings": lambda cfg: hr_settings(cfg, load_activities(cfg)),
     "headline": lambda cfg: metrics.headline(activities=load_activities(cfg), cfg=cfg),
     "weekly_load": lambda cfg, weeks: weekly_load(weeks, activities=load_activities(cfg), cfg=cfg),
@@ -108,6 +120,8 @@ COMPUTE = {
         column, activities=load_activities(cfg), cfg=cfg),
     "streams": lambda cfg, activity_id: streams.activity_streams(activity_id, cfg=cfg),
     "laps": lambda cfg, activity_id: streams.activity_laps(activity_id, cfg=cfg),
+    "drift": lambda cfg, activity_id: streams.drift_pct(cached("streams", cfg, activity_id)),
+    "activity_dynamics": _activity_dynamics,
 }
 
 

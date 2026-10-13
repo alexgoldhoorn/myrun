@@ -29,7 +29,8 @@ def test_after_a_warm_up_the_pages_default_calls_are_cache_hits(cfg, tmp_path, m
 
 def test_every_result_is_warmed_unless_it_needs_a_choice_from_the_page():
     warmed = {call[0] for call in warm.WARM}
-    assert set(common.COMPUTE) - warmed == {"streams", "laps", "dynamics_trend"}
+    assert set(common.COMPUTE) - warmed == {
+        "streams", "laps", "dynamics_trend", "activity_dynamics", "drift"}
 
 
 def test_one_failing_result_does_not_stop_the_rest(cfg, monkeypatch):

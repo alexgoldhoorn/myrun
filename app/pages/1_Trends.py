@@ -136,6 +136,7 @@ races, race_state = common.cached("races", cfg)
 if race_state.status != "off":
     st.subheader("Races")
     if races is not None:
+        races = common.cached("races_linked", cfg)
         kinds = []
         if "type" in races:
             kinds = st.multiselect("Type", sorted(races["type"].dropna().unique()))
@@ -150,7 +151,6 @@ if race_state.status != "off":
                 return theme.style(figure, height=360)
 
             st.plotly_chart(common.figure("race_rank", cfg, _rank_figure, tuple(kinds)))
-        races = links.fill_race_garmin_urls(races, acts)
         links_config = {c: st.column_config.LinkColumn(display_text="open")
                         for c in ("garmin_url", "strava_url") if c in races}
         st.dataframe(races.sort_values("date", ascending=False), hide_index=True,

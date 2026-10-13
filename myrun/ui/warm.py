@@ -20,7 +20,8 @@ from myrun.ui import common
 
 INTERVAL_S = 240        # under common.CACHE_TTL_S; each cycle recomputes the timed results
 # The calls the pages make with their default choices: (name, *arguments).
-WARM = (("input_states",), ("plan",), ("wellness",), ("races",), ("hr_settings",), ("headline",),
+WARM = (("input_states",), ("plan",), ("wellness",), ("races",), ("races_linked",),
+        ("hr_settings",), ("headline",),
         ("weekly_load", 12), ("weekly_runs", 12), ("plan_vs_actual",), ("efficiency",),
         ("volume", "month"), ("best_efforts",), ("vo2max_trend",), ("intensity_weekly", 12),
         ("shoes",), ("training_days", 12), ("race_readiness",))
