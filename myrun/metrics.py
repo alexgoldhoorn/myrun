@@ -34,8 +34,11 @@ HARD_ANAEROBIC_TE = 2.0        # 2.0 and up: the session had real anaerobic work
 INTENSITIES = ("easy", "steady", "hard")
 HEAT_SHIFT_C = 3.0             # a 4-week median this much warmer or cooler explains a pace change
 STREAK_RUNS = 3                # runs that make a week count towards the streak
-BUILD_WEEKS = 8                # the build-up window compared before a race
-SIMILAR_RACE_SHARE = 0.25      # an earlier race within 25 % of the distance is "similar"
+BUILD_WEEKS = ((15.0, 6), (30.0, 8), (float("inf"), 12))   # race km below -> build-up weeks compared
+DEFAULT_BUILD_WEEKS = 8        # when the race distance is unknown
+ROAD_RACE_SHARE = 0.05         # road: an earlier road race within 5 % of the distance is "similar"
+ROAD_RACE_CLIMB_M = 100.0      # ... and within this much climb, when the coming race's climb is known
+TRAIL_RACE_SHARE = 0.25        # trail: within 25 % of the distance, and of the climb when known
 
 
 def _now(today) -> pd.Timestamp:
@@ -286,15 +289,27 @@ def training_days(weeks: int = TREND_WEEKS, *, activities: pd.DataFrame | None =
     return pd.DataFrame({"date": dates, "minutes": minutes.to_numpy(dtype="float64")})
 
 
-def _build_up(runs: pd.DataFrame, end: pd.Timestamp) -> dict:
-    window = _last(runs, end, days=7 * BUILD_WEEKS)
+def build_weeks(distance_km: float | None) -> int:
+    """How many weeks of build-up to compare: longer races are prepared for longer."""
+    if distance_km is None:
+        return DEFAULT_BUILD_WEEKS
+    return next(weeks for below, weeks in BUILD_WEEKS if distance_km < below)
+
+
+def _build_up(runs: pd.DataFrame, end: pd.Timestamp, weeks: int) -> dict:
+    window = _last(runs, end, days=7 * weeks)
     return {"km": float(window["distance_km"].sum()),
             "longest_km": float(window["distance_km"].max()) if len(window) else 0.0}
 
 
 def race_readiness(runs: pd.DataFrame, plan: pd.DataFrame | None, now: pd.Timestamp) -> dict | None:
-    """The build-up to the next planned race, against the same point before the last race
-    of a similar distance. None without a plan or without a race ahead in it.
+    """The build-up to the next planned race, against the same point before the last
+    similar race. None without a plan or without a race ahead in it.
+
+    Similar means the same kind and close: road races are compared by time, so only a road
+    race of nearly the same distance (and climb, when known) counts; trail races differ
+    in everything, so a quarter of difference in distance and climb is allowed. The kind
+    is the plan's `surface`, or "trail" when the session name says so, else road.
 
     {race, date, days_to_go, weeks, km, longest_km, previous: {name, date, km, longest_km} | None}"""
     if plan is None:
@@ -304,20 +319,30 @@ def race_readiness(runs: pd.DataFrame, plan: pd.DataFrame | None, now: pd.Timest
         return None
     race = ahead.iloc[0]
     days_to_go = int((race["date"] - now).days)
-    out = {"race": str(race["session"]), "date": race["date"], "days_to_go": days_to_go,
-           "weeks": BUILD_WEEKS, **_build_up(runs, now), "previous": None}
     distance = clean(race.get("distance_km"))
+    weeks = build_weeks(distance)
+    out = {"race": str(race["session"]), "date": race["date"], "days_to_go": days_to_go,
+           "weeks": weeks, **_build_up(runs, now, weeks), "previous": None}
     if distance is None or "session_type" not in runs.columns:
         return out
+    surface = race.get("surface")
+    trail = surface == "trail" or (surface != "road" and "trail" in str(race["session"]).lower())
+    share = TRAIL_RACE_SHARE if trail else ROAD_RACE_SHARE
     similar = runs[(runs["session_type"] == "race") & (runs["date"] < now)
-                   & ((runs["distance_km"] - distance).abs() <= SIMILAR_RACE_SHARE * distance)]
+                   & ((runs["distance_km"] - distance).abs() <= share * distance)]
+    if "surface" in runs.columns:
+        similar = similar[(similar["surface"] != "road") if trail else (similar["surface"] == "road")]
+    climb = clean(race.get("elevation_m"))
+    if climb is not None and "elevation_m" in runs.columns:
+        allowed = TRAIL_RACE_SHARE * climb if trail else ROAD_RACE_CLIMB_M
+        similar = similar[(similar["elevation_m"] - climb).abs() <= allowed]
     if similar.empty:
         return out
     last = similar.sort_values("date").iloc[-1]
     name = last.get("race_name")
     out["previous"] = {"name": name if isinstance(name, str) and name else f"{last['date']:%d %b %Y}",
                        "date": last["date"],
-                       **_build_up(runs, last["date"] - pd.Timedelta(days=days_to_go))}
+                       **_build_up(runs, last["date"] - pd.Timedelta(days=days_to_go), weeks)}
     return out
 
 

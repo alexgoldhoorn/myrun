@@ -127,7 +127,15 @@ def read_plan(cfg: Config, today=None):
     df["session"] = df["session"].fillna("").str.strip()
     distance = df["distance_km"] if "distance_km" in df.columns else pd.Series(pd.NA, df.index)
     df["distance_km"] = pd.to_numeric(distance, errors="coerce").astype("float64")
-    df = df[["date", "session", "type", "distance_km"]].sort_values("date").reset_index(drop=True)
+    climb = df["elevation_m"] if "elevation_m" in df.columns else pd.Series(pd.NA, df.index)
+    df["elevation_m"] = pd.to_numeric(climb, errors="coerce").astype("float64")
+    if "surface" in df.columns:
+        kind = df["surface"].astype("string").str.strip().str.lower()
+        df["surface"] = none_if_missing(kind.where(kind.isin(SURFACES), None))
+    else:
+        df["surface"] = None
+    df = df[["date", "session", "type", "distance_km", "surface", "elevation_m"]]
+    df = df.sort_values("date").reset_index(drop=True)
 
     now = pd.Timestamp(today if today is not None else date.today()).normalize()
     monday = now - pd.Timedelta(days=now.weekday())
@@ -200,6 +208,8 @@ def read_garmin_activities(cfg: Config, now: float | None = None):
             text = df[column].astype("string").str.strip()
             df[column] = none_if_missing(text.where(text != "", None))
     df = df.dropna(subset=["start"]).sort_values("start").reset_index(drop=True)
+    if df.empty:
+        return _error(name, f"{path.name} has no rows with a readable start time")
     return df, _file_state(name, path, cfg, now)
 
 

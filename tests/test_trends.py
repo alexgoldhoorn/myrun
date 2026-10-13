@@ -75,3 +75,9 @@ def test_shoes_table_and_a_database_without_gear(cfg):
     assert shoes["name"].tolist() == ["Road <shoe>", "Old pair"]          # in use first; no bike
     assert shoes["km"].tolist() == pytest.approx([17.2, 10.0]) and shoes["runs"].tolist() == [2, 1]
     assert shoes["retired"].tolist() == [False, True]
+
+
+def test_shoe_status_has_a_check_band_before_the_limit():
+    assert [trends.shoe_status(km, False) for km in (699, 700, 999, 1000)] == [
+        "", "check (700 km)", "check (700 km)", "over 1000 km"]
+    assert trends.shoe_status(1200, True) == "retired"

@@ -47,7 +47,8 @@ def activity_dynamics(row: pd.Series, runs: pd.DataFrame, days: int = BASELINE_D
         else:
             previous = float(history.median())
             kind = f"{surface} " if isinstance(surface, str) else ""
-            note = f"vs median of {len(history)} {kind}runs, {days} days"
+            note = (f"vs median of {len(history)} {kind}run"
+                    f"{'' if len(history) == 1 else 's'}, {days} days")
         out.append(Metric(column, label, value, previous, unit, note=note))
     return out
 

@@ -33,7 +33,14 @@ def test_builders_use_the_theme_and_set_no_colours():
     points = pd.DataFrame({"temp_c": [10.0, 20.0, 15.0], "pace_min_km": [5.5, 6.0, 5.8]})
     figures = [charts.load_bars(weekly), charts.zone_bar(zones),
                charts.trend_line(trend, "month", "value", "Ground contact"),
-               charts.explore_figure(points, "temp_c", "pace_min_km")]
+               charts.explore_figure(points, "temp_c", "pace_min_km"),
+               charts.weekly_km_bars(pd.DataFrame({"week_start": weekly["week_start"],
+                                                   "run_km": [17.2, 0.0],
+                                                   "planned_km": [20.0, 25.0]})),
+               charts.stream_figure(pd.DataFrame({
+                   "time_s": [0, 60], "distance_m": [0.0, 200.0], "hr": [140, 150],
+                   "speed_ms": [3.0, 3.0], "pace_min_km": [5.5, 5.4], "altitude_m": [50.0, 51.0],
+                   "cadence_spm": [170, 172], "grade_pct": [0.0, 0.5], "moving": [True, True]}))]
     for fig in figures:
         assert fig.layout.margin.to_plotly_json() == theme.MARGIN
         assert not _has_own_colour(fig)

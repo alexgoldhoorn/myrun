@@ -13,7 +13,8 @@ from myrun.stravadb import open_db
 
 _FREQ = {"week": "W-SUN", "month": "M", "year": "Y"}
 MIN_EFFICIENCY_MINUTES = 20
-SHOE_LIMIT_KM = 700
+SHOE_CHECK_KM = 700            # from here a pair is worth checking
+SHOE_LIMIT_KM = 1000           # from here it is due for walking only
 
 
 def volume(by: str = "month", *, activities: pd.DataFrame | None = None,
@@ -89,6 +90,15 @@ def shoes(*, cfg: Config | None = None) -> pd.DataFrame:
     df["last_used"] = pd.to_datetime(df["last_used"]).dt.normalize()
     df["retired"] = df["retired"].astype(bool)
     return df[columns]
+
+
+def shoe_status(km: float, retired: bool) -> str:
+    """'' while a pair is fresh, a check note from SHOE_CHECK_KM, over from SHOE_LIMIT_KM."""
+    if retired:
+        return "retired"
+    if km >= SHOE_LIMIT_KM:
+        return f"over {SHOE_LIMIT_KM:g} km"
+    return f"check ({SHOE_CHECK_KM:g} km)" if km >= SHOE_CHECK_KM else ""
 
 
 def easy_runs(activities: pd.DataFrame, cfg: Config) -> pd.DataFrame:
