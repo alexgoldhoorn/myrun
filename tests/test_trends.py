@@ -81,3 +81,14 @@ def test_shoe_status_has_a_check_band_before_the_limit():
     assert [trends.shoe_status(km, False) for km in (699, 700, 999, 1000)] == [
         "", "check (700 km)", "check (700 km)", "over 1000 km"]
     assert trends.shoe_status(1200, True) == "retired"
+
+
+def test_shoes_does_not_hide_other_database_errors(cfg, monkeypatch):
+    import sqlite3
+
+    def broken(cfg):
+        raise sqlite3.OperationalError("no such table: Activity")
+
+    monkeypatch.setattr(trends, "open_db", broken)
+    with pytest.raises(sqlite3.OperationalError, match="no such table: Activity"):
+        trends.shoes(cfg=cfg)

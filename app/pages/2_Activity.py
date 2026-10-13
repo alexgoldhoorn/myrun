@@ -3,8 +3,7 @@
 import pandas as pd
 import streamlit as st
 
-from myrun import dynamics, fmt, links, streams
-from myrun.config import RUN_SPORTS
+from myrun import fmt, links, streams
 from myrun.ui import cards, charts, common
 
 cfg = common.setup("Activity")
@@ -56,8 +55,7 @@ session = row.get("session_name")
 if isinstance(session, str) and session:
     st.markdown(cards.note_html(f"Garmin session: {session}"), unsafe_allow_html=True)
 
-runs_only = acts[acts["sport"].isin(RUN_SPORTS)]
-dynamic_cards = dynamics.activity_dynamics(row, runs_only)
+dynamic_cards = common.cached("activity_dynamics", cfg, activity_id)
 if dynamic_cards:
     st.subheader("Running dynamics")
     cards.card_row(dynamic_cards)
@@ -92,7 +90,7 @@ with left:
         st.caption(f"Zones end at {edges} bpm; {heart.source}.")
 with right:
     st.subheader("HR drift")
-    drift = streams.drift_pct(data)
+    drift = common.cached("drift", cfg, activity_id)
     if drift is None:
         st.caption("Needs at least 30 minutes with heart rate and speed.")
     else:

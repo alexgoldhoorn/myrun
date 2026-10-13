@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from contextlib import closing
 
 import pandas as pd
@@ -67,6 +68,10 @@ def best_efforts(distances=(1000, 5000, 10000, 21097), *, cfg: Config | None = N
     return df[["activity_id", "date", "distance_m", "time_s", "pace_min_km", "is_record"]]
 
 
+# What SQLite says when the database predates gear: no table, or no gear columns.
+_NO_GEAR = re.compile(r"no such (table: Gear|column: \w+\.(gearId|isRetired))\b")
+
+
 def shoes(*, cfg: Config | None = None) -> pd.DataFrame:
     """Running distance per shoe: name, km, runs, last_used, retired. In use first.
 
@@ -84,7 +89,7 @@ def shoes(*, cfg: Config | None = None) -> pd.DataFrame:
                     GROUP BY g.gearId ORDER BY retired, km DESC""",
                 conn, params=list(RUN_SPORTS))
     except Exception as exc:
-        if "no such" not in str(exc):      # anything but a missing Gear table or gearId column
+        if not _NO_GEAR.search(str(exc)):      # any other database error is a real one
             raise
         return pd.DataFrame(columns=columns)
     df["last_used"] = pd.to_datetime(df["last_used"]).dt.normalize()
