@@ -44,3 +44,19 @@ def test_builders_use_the_theme_and_set_no_colours():
     for fig in figures:
         assert fig.layout.margin.to_plotly_json() == theme.MARGIN
         assert not _has_own_colour(fig)
+
+
+def test_the_cards_follow_the_theme_streamlit_is_showing():
+    """Streamlit marks its theme with color-scheme on .stApp; light-dark() follows it."""
+    for name, (light, dark) in theme.COLOURS.items():
+        assert f"--mr-{name}: light-dark({light}, {dark});" in theme.CSS
+    assert ".stApp { --mr-surface: light-dark(" in theme.CSS
+    assert "prefers-color-scheme: dark" in theme.CSS       # for a browser without light-dark()
+    assert ".mr-card" in theme.CSS
+
+
+def test_the_menu_that_switches_light_and_dark_is_shown():
+    import tomllib
+    from pathlib import Path
+    config = tomllib.loads((Path(__file__).parents[1] / ".streamlit/config.toml").read_text())
+    assert config["client"]["toolbarMode"] == "viewer"

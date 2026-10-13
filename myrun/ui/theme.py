@@ -14,19 +14,31 @@ import streamlit as st
 MARGIN = {"l": 10, "r": 10, "t": 10, "b": 10}
 TONE_CLASS = {"neutral": "mr-neutral", "good": "mr-good", "warn": "mr-warn", "bad": "mr-bad"}
 
-CSS = """
-:root {
-  --mr-surface: #ffffff; --mr-border: #dee2e6; --mr-muted: #6c757d; --mr-text: #212529;
-  --mr-line: #2a78d6; --mr-good: #16a34a; --mr-warn: #b45309; --mr-bad: #dc2626;
-  --mr-neutral: #6c757d;
+# name: (light, dark)
+COLOURS = {
+    "surface": ("#ffffff", "#212529"), "border": ("#dee2e6", "#373b3e"),
+    "muted": ("#6c757d", "#9aa4b1"), "text": ("#212529", "#e9ecef"),
+    "line": ("#2a78d6", "#3987e5"), "good": ("#16a34a", "#22c55e"),
+    "warn": ("#b45309", "#fbbf24"), "bad": ("#dc2626", "#f87171"),
+    "neutral": ("#6c757d", "#9aa4b1"),
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --mr-surface: #212529; --mr-border: #373b3e; --mr-muted: #9aa4b1; --mr-text: #e9ecef;
-    --mr-line: #3987e5; --mr-good: #22c55e; --mr-warn: #fbbf24; --mr-bad: #f87171;
-    --mr-neutral: #9aa4b1;
-  }
-}
+
+
+def _colours() -> str:
+    """The card colours as CSS variables that follow the theme Streamlit is showing.
+
+    Streamlit sets `color-scheme` on .stApp for the theme chosen in its menu, and
+    light-dark() reads that. The first two rules serve a browser without light-dark():
+    there the cards follow the browser's own setting."""
+    light = " ".join(f"--mr-{name}: {pair[0]};" for name, pair in COLOURS.items())
+    dark = " ".join(f"--mr-{name}: {pair[1]};" for name, pair in COLOURS.items())
+    both = " ".join(f"--mr-{name}: light-dark({pair[0]}, {pair[1]});"
+                    for name, pair in COLOURS.items())
+    return (f":root {{ {light} }}\n@media (prefers-color-scheme: dark) {{ :root {{ {dark} }} }}\n"
+            f"@supports (color: light-dark(#000, #fff)) {{ .stApp {{ {both} }} }}")
+
+
+_RULES = """
 .block-container { padding-top: 2.5rem; max-width: 1400px; }
 .mr-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
           gap: 0.75rem; margin: 0 0 1rem 0; }
@@ -70,6 +82,9 @@ CSS = """
 h1 { font-weight: 650; letter-spacing: -0.01em; }
 h3 { font-size: 1.05rem; font-weight: 600; margin-top: 0.5rem; }
 """
+
+
+CSS = _colours() + _RULES
 
 
 def apply() -> None:
