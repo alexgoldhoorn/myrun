@@ -13,9 +13,9 @@ from myrun.hr import hr_settings
 from myrun.stravadb import open_db
 
 _FREQ = {"week": "W-SUN", "month": "M", "year": "Y"}
-MIN_EFFICIENCY_MINUTES = 20
-SHOE_CHECK_KM = 700            # from here a pair is worth checking
-SHOE_LIMIT_KM = 1000           # from here it is due for walking only
+MIN_EFFICIENCY_MINUTES = 20    # chosen: shorter easy runs are too noisy to compare
+SHOE_CHECK_KM = 700            # confirmed (the owner's Garmin Connect band): worth checking from here
+SHOE_LIMIT_KM = 1000           # confirmed: from here it is due for walking only
 
 
 def volume(by: str = "month", *, activities: pd.DataFrame | None = None,

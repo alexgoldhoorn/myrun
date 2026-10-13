@@ -19,11 +19,13 @@ import pandas as pd
 
 from myrun.config import RUN_SPORTS, Config
 
-ZONE_FRACTIONS = (0.60, 0.70, 0.80, 0.90)   # upper edge of zones 1 to 4
-EASY_FRACTIONS = (0.65, 0.80)
-OBSERVED_DAYS = 365
+# Used only when the config sets no `hr:` zones. All chosen (the common share-of-max-HR
+# zone model), not fitted to the runner: set `hr:` in the config to overrule them.
+ZONE_FRACTIONS = (0.60, 0.70, 0.80, 0.90)   # upper edge of zones 1 to 4, as a share of max HR
+EASY_FRACTIONS = (0.65, 0.80)               # the easy band, as a share of max HR
+OBSERVED_DAYS = 365                         # max HR is looked for in the runs of the last year
 OBSERVED_QUANTILE = 0.995                   # ignores the odd sensor spike
-MIN_OBSERVED_RUNS = 5
+MIN_OBSERVED_RUNS = 5                       # fewer runs with heart rate give no max HR
 
 
 @dataclass(frozen=True)

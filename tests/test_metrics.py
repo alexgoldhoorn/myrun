@@ -267,22 +267,52 @@ def _easy(rows):
                          "pace_min_km": [p for _, p, _ in rows], "temp_c": [c for _, _, c in rows]})
 
 
-def test_a_slower_easy_pace_in_warmer_weather_is_not_coloured_as_lost_fitness():
-    card = metrics.easy_pace_card(_easy([(2, 6.0, 24.0), (5, 6.0, 26.0), (35, 5.5, 14.0)]), (), NOW)
+def _history(per_degree, runs=40):
+    """Older easy runs between 5 and 25 °C whose pace is 5.5 at 15 °C and rises per degree."""
+    temps = [5 + 20 * i / (runs - 1) for i in range(runs)]
+    return [(60 + 7 * i, 5.5 + per_degree * (t - 15), t) for i, t in enumerate(temps)]
+
+
+def test_the_cost_of_heat_is_fitted_on_the_runners_own_easy_runs():
+    assert metrics.heat_cost(_easy(_history(0.05)), NOW) == pytest.approx(0.05)
+    assert metrics.heat_cost(_easy(_history(0.0)), NOW) == pytest.approx(0.0)
+    assert metrics.heat_cost(_easy(_history(-0.05)), NOW) == 0.0       # heat never speeds you up
+    assert metrics.heat_cost(_easy(_history(0.05, runs=10)), NOW) is None      # too few runs
+    assert metrics.heat_cost(_easy([(60 + i, 5.5, 15.0) for i in range(40)]), NOW) is None
+    old = [(d + metrics.HEAT_FIT_DAYS, p, t) for d, p, t in _history(0.05)]
+    assert metrics.heat_cost(_easy(old), NOW) is None                   # outside the window
+
+
+def test_a_slower_easy_pace_that_the_warmer_weather_accounts_for_is_not_coloured():
+    rows = [(2, 6.0, 25.0), (5, 6.0, 25.0), (35, 5.5, 15.0)] + _history(0.05)
+    card = metrics.easy_pace_card(_easy(rows), (), NOW)
     assert card.value == 6.0 and card.previous == 5.5
     assert card.tone == "neutral"
-    assert card.note == "slower, but 11 °C warmer than the previous 4 weeks"
+    assert card.note == "slower, but 10 °C warmer than the previous 4 weeks"
 
 
-def test_a_slower_easy_pace_in_the_same_weather_stays_red():
-    card = metrics.easy_pace_card(_easy([(2, 6.0, 15.0), (35, 5.5, 14.0)]), (), NOW)
+def test_a_slower_easy_pace_stays_red_when_heat_costs_this_runner_nothing():
+    rows = [(2, 6.0, 25.0), (35, 5.5, 15.0)] + _history(0.0)
+    card = metrics.easy_pace_card(_easy(rows), (), NOW)
     assert card.tone == "bad" and card.note == "vs previous 4 weeks, easy road runs"
 
 
-def test_a_faster_easy_pace_in_cooler_weather_is_not_coloured_as_gained_fitness():
-    card = metrics.easy_pace_card(_easy([(2, 5.0, 8.0), (35, 5.5, 20.0)]), (), NOW)
+def test_a_slower_easy_pace_stays_red_when_the_weather_explains_only_part_of_it():
+    rows = [(2, 6.1, 17.0), (35, 5.5, 15.0)] + _history(0.05)
+    card = metrics.easy_pace_card(_easy(rows), (), NOW)
+    assert card.tone == "bad" and card.note == "vs previous 4 weeks, easy road runs"
+
+
+def test_a_slower_easy_pace_stays_red_without_enough_runs_to_judge_the_weather():
+    card = metrics.easy_pace_card(_easy([(2, 6.0, 25.0), (35, 5.5, 15.0)]), (), NOW)
+    assert card.tone == "bad" and card.note == "vs previous 4 weeks, easy road runs"
+
+
+def test_a_faster_easy_pace_that_the_cooler_weather_accounts_for_is_not_coloured():
+    rows = [(2, 5.0, 5.0), (35, 5.5, 15.0)] + _history(0.05)
+    card = metrics.easy_pace_card(_easy(rows), (), NOW)
     assert card.tone == "neutral"
-    assert card.note == "faster, but 12 °C cooler than the previous 4 weeks"
+    assert card.note == "faster, but 10 °C cooler than the previous 4 weeks"
 
 
 def _days(days_ago):
