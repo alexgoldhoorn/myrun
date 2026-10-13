@@ -15,6 +15,8 @@ from myrun.trends import easy_runs
 
 TREND_WEEKS = 12
 RECOVERY_DAYS = 14
+MIN_PLAN_DAYS = 7              # Plan done needs this many days covered by the plan
+FEED_LAG_DAYS = 1              # days of activities without a Garmin load before the card says so
 TONE_TOLERANCE = 0.05          # a change under 5 % is not coloured
 _LOAD_TONES = {"low": "warn", "steady": "good", "high": "warn", "very high": "bad",
                "no data": "neutral"}
@@ -193,40 +195,65 @@ def vo2max_trend(activities: pd.DataFrame) -> pd.DataFrame:
                                                      n_runs=("activity_id", "count"))
 
 
+def _plan_window(runs: pd.DataFrame, plan: pd.DataFrame, end: pd.Timestamp):
+    """(km done, km planned, days) over the part of the 28 days to `end` that the plan covers.
+
+    Runs count only where the plan can be compared with them: from its first to its last
+    day, and not on days whose running session has no distance (planned by time)."""
+    first, last = max(end - pd.Timedelta(days=27), plan["date"].min()), min(end, plan["date"].max())
+    days = int((last - first).days) + 1
+    if days <= 0:
+        return 0.0, 0.0, 0
+    planned = _between(plan[~plan["type"].isin(NON_RUN_PLAN_TYPES)], first, last)
+    by_time = planned.loc[planned["distance_km"].isna(), "date"]
+    done = _between(runs, first, last)
+    done = done[~done["date"].isin(by_time)]
+    return float(done["distance_km"].sum()), float(planned["distance_km"].sum()), days
+
+
 def adherence_card(runs: pd.DataFrame, plan: pd.DataFrame | None, now: pd.Timestamp) -> Metric | None:
     """Running km done as a share of the km planned, over the 4 weeks ending yesterday.
 
-    Today is left out: its session is not due yet. None when there is no plan."""
-    if plan is None:
+    Today is left out: its session is not due yet. Only the days the plan covers are
+    compared; with under a week of them there is no value. None when there is no plan."""
+    if plan is None or plan.empty:
         return None
-    planned = plan[~plan["type"].isin(NON_RUN_PLAN_TYPES)]
     end = now - pd.Timedelta(days=1)
-
-    def window(last: pd.Timestamp) -> tuple[float, float]:
-        return (float(_last(runs, last)["distance_km"].sum()),
-                float(_last(planned, last)["distance_km"].sum()))
-
-    done, due = window(end)
-    done_before, due_before = window(end - pd.Timedelta(days=28))
+    done, due, days = _plan_window(runs, plan, end)
+    done_before, due_before, days_before = _plan_window(runs, plan, end - pd.Timedelta(days=28))
+    if days < MIN_PLAN_DAYS:
+        return Metric("plan_done", "Plan done", None, None, "share",
+                      note="the plan covers under a week of the last 4")
     if due <= 0:
         return Metric("plan_done", "Plan done", None, None, "share",
                       note="no planned distances in the last 4 weeks")
-    return Metric("plan_done", "Plan done", 100 * done / due,
-                  100 * done_before / due_before if due_before > 0 else None, "share",
-                  note="last 4 weeks to yesterday, vs the 4 before",
-                  detail=f"{done:.1f} of {due:.1f} km")
+    previous = 100 * done_before / due_before if due_before > 0 and days_before >= MIN_PLAN_DAYS else None
+    note = ("last 4 weeks to yesterday, vs the 4 before" if days == 28
+            else f"the {days} days the plan covers, to yesterday")
+    return Metric("plan_done", "Plan done", 100 * done / due, previous, "share",
+                  note=note, detail=f"{done:.1f} of {due:.1f} km")
 
 
 def garmin_load_card(acts: pd.DataFrame, now: pd.Timestamp, cfg: Config) -> Metric | None:
     """The load ratio again, on Garmin's training load (every activity, gym and walks too).
 
-    None when the activities carry no Garmin load at all (no Garmin input)."""
+    None when the activities carry no Garmin load at all (no Garmin input). No value while
+    the feed is behind: activities without a load would count as no load at all. Today's
+    are expected to lack one, the feed runs once a day."""
     if "garmin_load" not in acts.columns:
         return None
+    label = "Garmin load, 7 days vs 4 weeks"
+    recent = _last(acts, now, days=7)
+    newest = recent.loc[recent["garmin_load"].notna(), "date"].max()
+    behind = recent if pd.isna(newest) else recent[recent["date"] > newest]
+    if behind["date"].nunique() > FEED_LAG_DAYS:
+        return Metric("garmin_load_ratio", label, None, None, "ratio",
+                      note=f"the Garmin feed is behind: {len(behind)} recent activities "
+                           "have no load yet")
     status = load_status(activities=acts, today=now, cfg=cfg, column="garmin_load")
     earlier = load_status(activities=acts, today=now - pd.Timedelta(days=7), cfg=cfg,
                           column="garmin_load")
-    return Metric("garmin_load_ratio", "Garmin load, 7 days vs 4 weeks", clean(status["ratio"]),
+    return Metric("garmin_load_ratio", label, clean(status["ratio"]),
                   clean(earlier["ratio"]), "ratio", tone=_LOAD_TONES[status["label"]],
                   note="all activities, vs a week ago" if status["ratio"] is not None
                   else "no Garmin load in the last 4 weeks", detail=status["label"])

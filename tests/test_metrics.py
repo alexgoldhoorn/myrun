@@ -210,7 +210,7 @@ def _plan(rows):
 def test_plan_adherence_is_done_over_planned_through_yesterday():
     plan = _plan([(0, "easy", 99.0),                  # today: not due yet
                   (2, "easy", 10.0), (5, "long", 20.0), (9, "rest", None), (20, "tempo", 10.0),
-                  (30, "easy", 10.0), (33, "strength", None)])
+                  (30, "easy", 10.0), (33, "strength", None), (40, "rest", None)])
     runs = _runs([(0, 5, 30, None, None, None), (2, 10, 60, None, None, None),
                   (5, 15, 90, None, None, None), (21, 5, 30, None, None, None),
                   (30, 12, 70, None, None, None)])
@@ -224,7 +224,7 @@ def test_plan_adherence_is_done_over_planned_through_yesterday():
 
 def test_plan_adherence_without_planned_distances_says_why():
     card = metrics.adherence_card(_runs([(2, 10, 60, None, None, None)]),
-                                  _plan([(2, "easy", None)]), NOW)
+                                  _plan([(d, "easy", None) for d in range(1, 10)]), NOW)
     assert card.value is None and card.note == "no planned distances in the last 4 weeks"
     assert metrics.adherence_card(_runs([]), None, NOW) is None
 
@@ -400,3 +400,38 @@ def test_a_trail_race_allows_a_quarter_of_difference_in_distance_and_climb():
 def test_the_build_up_window_grows_with_the_race_distance():
     assert [metrics.build_weeks(km) for km in (5, 10, 21.1, 42.2, None)] == [6, 6, 8, 12, 8]
     assert metrics.race_readiness(_kind_runs("road", 10, 20), _race_plan("10k", 10.0), NOW)["weeks"] == 6
+
+
+# ---- review findings ----
+
+def test_plan_done_counts_only_the_days_the_plan_covers():
+    runs = _runs([(d, 5, 30, None, None, None) for d in range(1, 29)])       # 5 km every day
+    plan = _plan([(d, "easy", 5) for d in range(1, 8)])                      # plan starts a week ago
+    card = metrics.adherence_card(runs, plan, NOW)
+    assert card.value == pytest.approx(100.0) and card.detail == "35.0 of 35.0 km"
+    assert card.note == "the 7 days the plan covers, to yesterday" and card.previous is None
+
+
+def test_plan_done_leaves_out_days_whose_session_has_no_distance():
+    runs = _runs([(d, 5, 30, None, None, None) for d in range(1, 29)])
+    plan = _plan([(d, "easy", 5 if d % 2 else None) for d in range(1, 29)])  # every other one by time
+    assert metrics.adherence_card(runs, plan, NOW).value == pytest.approx(100.0)
+
+
+def test_plan_done_is_not_given_for_a_plan_that_ended_or_only_just_started():
+    runs = _runs([(d, 5, 30, None, None, None) for d in range(1, 29)])
+    for days in (range(1, 4), range(25, 40)):                                # 3 days; ended 25 days ago
+        card = metrics.adherence_card(runs, _plan([(d, "easy", 5) for d in days]), NOW)
+        assert card.value is None and card.note == "the plan covers under a week of the last 4"
+
+
+def test_garmin_load_is_not_given_while_the_feed_is_days_behind(cfg):
+    acts = _runs([(d, 8, 45, None, None, None) for d in range(0, 28)])
+    acts["garmin_load"] = 100.0
+    assert metrics.garmin_load_card(acts, NOW, cfg).value == pytest.approx(1.0)
+    acts.loc[acts["date"] >= NOW, "garmin_load"] = None                      # today: the feed runs tomorrow
+    assert metrics.garmin_load_card(acts, NOW, cfg).value is not None
+    acts.loc[acts["date"] >= NOW - pd.Timedelta(days=3), "garmin_load"] = None
+    card = metrics.garmin_load_card(acts, NOW, cfg)
+    assert card.value is None and card.detail is None and card.tone == "neutral"
+    assert card.note == "the Garmin feed is behind: 4 recent activities have no load yet"
