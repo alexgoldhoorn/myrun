@@ -56,6 +56,14 @@ CSS = """
 .mr-day-2 { background: var(--mr-line); opacity: 0.65; }
 .mr-day-3 { background: var(--mr-line); }
 .mr-day-future { background: transparent; border: 1px dashed var(--mr-border); }
+.mr-compact { min-height: 0; padding-bottom: 0.75rem; }
+.mr-row-compact { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.mr-compact .mr-value { font-size: 1.35rem; white-space: nowrap; }
+.mr-links { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0 0 0.75rem 0; }
+.mr-link { border: 1px solid var(--mr-border); border-radius: 0.5rem; padding: 0.35rem 0.8rem;
+           background: var(--mr-surface); color: var(--mr-text) !important; font-size: 0.9rem;
+           text-decoration: none !important; white-space: nowrap; }
+.mr-link:hover { border-color: var(--mr-line); color: var(--mr-line) !important; }
 [data-testid="stMetric"] { background: var(--mr-surface); border: 1px solid var(--mr-border);
                            border-radius: 0.5rem; padding: 0.7rem 1rem; }
 [data-testid="stMetricValue"] { font-variant-numeric: tabular-nums; }

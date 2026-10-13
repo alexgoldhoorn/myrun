@@ -120,16 +120,16 @@ if dynamic_columns:
 shoes = common.cached("shoes", cfg)
 if len(shoes):
     st.subheader("Shoes")
-    limit = trends.SHOE_LIMIT_KM
     table = pd.DataFrame({
         "Shoe": shoes["name"], "km": shoes["km"].round(0), "Runs": shoes["runs"],
         "Last used": shoes["last_used"].dt.strftime("%d %b %Y"),
-        "Status": ["retired" if retired else (f"over {limit:g} km" if km >= limit else "")
-                   for retired, km in zip(shoes["retired"], shoes["km"])],
+        "Status": [trends.shoe_status(km, retired)
+                   for km, retired in zip(shoes["km"], shoes["retired"])],
     })
     st.dataframe(table, hide_index=True)
-    st.caption(f"Running distance per shoe from Strava gear. {limit:g} km is a common point "
-               "to start checking the midsole.")
+    st.caption(f"Running distance per shoe from Strava gear. Worth a check from "
+               f"{trends.SHOE_CHECK_KM:g} km; past {trends.SHOE_LIMIT_KM:g} km a pair is due "
+               "for walking only.")
 
 # ---- races ----------------------------------------------------------------
 races, race_state = common.cached("races", cfg)

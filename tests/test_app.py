@@ -189,7 +189,7 @@ def test_activity_page_shows_the_newest_activity_with_streams(baseline):
     at = run_page("pages/2_Activity.py")
     text = _text(at)
     assert "HR drift" in text and "Time in HR zones" in text and "Laps" in text
-    assert any("strava.com/activities/1" in str(b.url) for b in at.get("link_button"))
+    assert 'class="mr-link" href="https://www.strava.com/activities/1"' in _text(at)
 
 
 def test_activity_page_handles_an_activity_without_stream_data(baseline):
@@ -226,16 +226,15 @@ def test_pages_say_where_the_hr_zones_come_from(baseline):
 
 def test_activity_page_shows_pace_as_minutes_and_seconds(baseline):
     at = run_page("pages/2_Activity.py")
-    paces = [m.value for m in at.metric if m.label == "Pace"]
-    assert paces == ["5:33 /km"]                          # 40 min over 7.2 km
+    assert ('<div class="mr-label">Pace</div><div class="mr-value">5:33 /km</div>'
+            in _text(at))                                  # 40 min over 7.2 km
 
 
 def test_activity_page_shows_running_dynamics_with_the_feed(everything):
     at = run_page("pages/2_Activity.py")
     assert "Running dynamics" in _text(at)
     assert "Ground contact" in _text(at) and "250 ms" in _text(at)
-    assert any("connect.garmin.com/modern/activity/111" in str(b.url)
-               for b in at.get("link_button"))
+    assert "connect.garmin.com/modern/activity/111" in _text(at)
 
 
 def test_activity_page_hides_running_dynamics_without_the_feed(baseline):

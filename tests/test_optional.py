@@ -251,3 +251,21 @@ def test_garmin_file_with_an_unknown_suffix_is_an_error(cfg, tmp_path):
     path.write_text("start\n")
     df, state = optional.read_garmin_activities(with_inputs(cfg, garmin_activities=path))
     assert df is None and state.status == "error" and ".csv or .parquet" in state.message
+
+
+def test_a_garmin_file_with_a_header_and_no_readable_rows_is_an_error(cfg, tmp_path):
+    path = tmp_path / "empty.csv"
+    path.write_text("start,garmin_activity_id,session_name\nnot a date,1,x\n")
+    df, state = optional.read_garmin_activities(with_inputs(cfg, garmin_activities=path))
+    assert df is None and state.status == "error" and "no rows" in state.message
+
+
+def test_plan_carries_surface_and_climb_when_the_file_has_them(cfg, tmp_path):
+    path = tmp_path / "plan.csv"
+    path.write_text("date,session,type,distance_km,surface,elevation_m\n"
+                    f"{TODAY},Hill race,race,20,Trail,900\n")
+    plan, _ = optional.read_plan(with_inputs(cfg, plan_csv=path), today=TODAY)
+    assert plan.loc[0, "surface"] == "trail" and plan.loc[0, "elevation_m"] == 900.0
+    path.write_text(f"date,session,type\n{TODAY},Easy,easy\n")
+    plan, _ = optional.read_plan(with_inputs(cfg, plan_csv=path), today=TODAY)
+    assert plan.loc[0, "surface"] is None and pd.isna(plan.loc[0, "elevation_m"])

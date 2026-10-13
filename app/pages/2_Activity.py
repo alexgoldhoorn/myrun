@@ -38,27 +38,23 @@ def _fmt(value, pattern):
     return "n/a" if pd.isna(value) else pattern.format(value)
 
 
-for slot, (label, text) in zip(st.columns(5), [
+st.markdown(cards.summary_html([
     ("Distance", _fmt(row["distance_km"], "{:.2f} km")),
     ("Time", _fmt(row["duration_min"], "{:.0f} min")),
     ("Pace", "n/a" if pd.isna(row["pace_min_km"]) else f"{fmt.pace(row['pace_min_km'])} /km"),
     ("Avg HR", _fmt(row["avg_hr"], "{:.0f} bpm")),
     ("Climb", _fmt(row["elevation_m"], "{:.0f} m")),
-]):
-    slot.metric(label, text)
+]), unsafe_allow_html=True)
 
-link_slots = st.columns(6)
-link_slots[0].link_button("Strava", links.strava_url(activity_id))
-stats_url = links.sfs_url(cfg.sfs_url, activity_id)
-if stats_url:
-    link_slots[1].link_button("statistics-for-strava", stats_url)
-garmin_url = links.garmin_url(row.get("garmin_activity_id"))
-if garmin_url:
-    link_slots[2].link_button("Garmin Connect", garmin_url)
+st.markdown(cards.links_html([
+    ("Strava", links.strava_url(activity_id)),
+    ("statistics-for-strava", links.sfs_url(cfg.sfs_url, activity_id)),
+    ("Garmin Connect", links.garmin_url(row.get("garmin_activity_id"))),
+]), unsafe_allow_html=True)
 
 session = row.get("session_name")
 if isinstance(session, str) and session:
-    st.caption(f"Garmin session: {session}")
+    st.markdown(cards.note_html(f"Garmin session: {session}"), unsafe_allow_html=True)
 
 runs_only = acts[acts["sport"].isin(RUN_SPORTS)]
 dynamic_cards = dynamics.activity_dynamics(row, runs_only)

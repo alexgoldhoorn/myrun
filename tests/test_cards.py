@@ -62,3 +62,23 @@ def test_readiness_strip_escapes_names():
     assert "Autumn &lt;Half&gt;" in html and "Spring &amp; Half" in html
     assert "104 km" in html and "longest 24 km" in html and "<Half>" not in html
     assert cards.readiness_html(None) == ""
+
+
+def test_links_are_one_escaped_row_of_buttons():
+    html = cards.links_html([("Strava", "https://example.org/a?x=1&y=2"), ("Skipped", None),
+                             ("A <b>", "https://example.org/b")])
+    assert html.count('class="mr-link"') == 2 and "Skipped" not in html
+    assert "x=1&amp;y=2" in html and "A &lt;b&gt;" in html and 'rel="noopener"' in html
+    assert cards.links_html([("None", None)]) == ""
+
+
+def test_note_html_escapes_markdown_and_markup():
+    assert cards.note_html("Garmin session: 5 x *1 km* <fast>") == (
+        '<div class="mr-note">Garmin session: 5 x &#42;1 km&#42; &lt;fast&gt;</div>')
+
+
+def test_summary_cards_show_a_label_and_the_whole_value():
+    html = cards.summary_html([("Distance", "12.34 km"), ("Pace", "5:33 /km")])
+    assert html.count("mr-card mr-compact") == 2
+    assert '<div class="mr-value">12.34 km</div>' in html
+    assert cards.summary_html([]) == ""

@@ -65,3 +65,11 @@ def test_an_activity_that_is_not_a_run_has_no_cards():
     assert dynamics.activity_dynamics(frame.iloc[1], frame) == []
     assert [c.key for c in dynamics.activity_dynamics(frame.iloc[0], frame)] == ["power_w",
                                                                                "aerobic_te"]
+
+
+def test_the_note_for_a_single_earlier_run_is_singular():
+    frame = pd.DataFrame({
+        "activity_id": ["a", "b"], "start": pd.to_datetime(["2026-09-20", "2026-10-01"]),
+        "surface": ["road", "road"], "ground_contact_ms": [240.0, 250.0],
+    })
+    assert dynamics.activity_dynamics(frame.iloc[1], frame)[0].note == "vs median of 1 road run, 90 days"

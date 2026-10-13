@@ -362,3 +362,41 @@ def test_sleep_and_hrv_cards_carry_garmin_detail(cfg, tmp_path):
     assert list(recovery) == ["hrv_ms", "sleep_hours"]
     assert recovery["sleep_hours"].detail == "score 82, deep 1.2 h, REM 1.5 h"
     assert recovery["hrv_ms"].detail == "unbalanced"
+
+
+def _kind_runs(surface, km, climb):
+    runs = _runs([(100, km, 110, None, None, None), (3, 10, 60, None, None, None)])
+    runs["surface"] = [surface, "road"]
+    runs["elevation_m"] = [float(climb), 20.0]
+    runs["session_type"] = ["race", None]
+    runs["race_name"] = ["Earlier", None]
+    return runs
+
+
+def _race_plan(session, km, **extra):
+    return pd.DataFrame({"date": [NOW + pd.Timedelta(days=20)], "type": ["race"],
+                         "session": [session], "distance_km": [km], **extra})
+
+
+def test_a_road_race_is_only_compared_with_a_road_race_of_nearly_the_same_distance():
+    assert metrics.race_readiness(_kind_runs("road", 21.0, 80), _race_plan("Half", 21.1), NOW)["previous"]
+    assert metrics.race_readiness(_kind_runs("road", 19.0, 80), _race_plan("Half", 21.1), NOW)["previous"] is None
+    assert metrics.race_readiness(_kind_runs("trail", 21.0, 80), _race_plan("Half", 21.1), NOW)["previous"] is None
+    hilly = _race_plan("Half", 21.1, elevation_m=[50.0])        # climb known: must be within 100 m
+    assert metrics.race_readiness(_kind_runs("road", 21.0, 300), hilly, NOW)["previous"] is None
+
+
+def test_a_trail_race_allows_a_quarter_of_difference_in_distance_and_climb():
+    trail = _race_plan("Coast Trail", 20.0, elevation_m=[1000.0])
+    assert metrics.race_readiness(_kind_runs("trail", 24.0, 800), trail, NOW)["previous"]
+    assert metrics.race_readiness(_kind_runs("trail", 24.0, 400), trail, NOW)["previous"] is None
+    assert metrics.race_readiness(_kind_runs("road", 20.0, 900), trail, NOW)["previous"] is None
+    named = _race_plan("Forest Trail 20", 20.0)                 # no surface column: the name says trail
+    assert metrics.race_readiness(_kind_runs("mixed", 23.0, 500), named, NOW)["previous"]
+    stated = _race_plan("Hill race", 20.0, surface=["trail"])
+    assert metrics.race_readiness(_kind_runs("trail", 23.0, 500), stated, NOW)["previous"]
+
+
+def test_the_build_up_window_grows_with_the_race_distance():
+    assert [metrics.build_weeks(km) for km in (5, 10, 21.1, 42.2, None)] == [6, 6, 8, 12, 8]
+    assert metrics.race_readiness(_kind_runs("road", 10, 20), _race_plan("10k", 10.0), NOW)["weeks"] == 6

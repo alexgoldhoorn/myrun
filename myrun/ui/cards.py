@@ -57,6 +57,30 @@ def strip_html(items: list[tuple[str, str]]) -> str:
     return f'<div class="mr-strip">{parts}</div>'
 
 
+def summary_html(items: list[tuple[str, str]]) -> str:
+    """A row of small cards holding a label and a ready-made value, nothing else.
+
+    The row wraps instead of cutting text off, so a value is always shown in full."""
+    parts = "".join(f'<div class="mr-card mr-compact"><div class="mr-label">{escape(label)}</div>'
+                    f'<div class="mr-value">{escape(value)}</div></div>' for label, value in items)
+    return f'<div class="mr-row mr-row-compact">{parts}</div>' if parts else ""
+
+
+def links_html(items: list[tuple[str, str | None]]) -> str:
+    """Outgoing links as one row of evenly spaced buttons; entries without a URL are left out."""
+    parts = "".join(f'<a class="mr-link" href="{escape(url)}" target="_blank" rel="noopener">'
+                    f'{escape(label)}</a>' for label, url in items if url)
+    return f'<div class="mr-links">{parts}</div>' if parts else ""
+
+
+_MARKDOWN = str.maketrans({c: f"&#{ord(c)};" for c in "*_`[]~$"})
+
+
+def note_html(text: str) -> str:
+    """A small grey line of plain text: neither markup nor Markdown in it is interpreted."""
+    return f'<div class="mr-note">{escape(text).translate(_MARKDOWN)}</div>'
+
+
 _DAY_LEVELS = (30, 60)       # minutes: under 30 is light, under 60 medium, the rest full
 
 
