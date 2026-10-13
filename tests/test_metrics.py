@@ -312,7 +312,7 @@ def test_training_days_cover_whole_weeks_and_leave_the_future_blank():
     acts = _runs([(0, 5, 30, None, None, None), (0, 0, 20, None, None, None),
                   (8, 5, 45, None, None, None)])
     days = metrics.training_days(2, activities=acts, today=TODAY)
-    assert list(days.columns) == ["date", "minutes"] and len(days) == 14
+    assert list(days.columns) == ["date", "minutes", "activities"] and len(days) == 14
     assert days["date"].iloc[0] == NOW - pd.Timedelta(days=7)    # Monday of last week
     by_date = days.set_index("date")["minutes"]
     assert by_date[NOW] == 50.0 and by_date[NOW - pd.Timedelta(days=6)] == 0.0
@@ -435,3 +435,44 @@ def test_garmin_load_is_not_given_while_the_feed_is_days_behind(cfg):
     card = metrics.garmin_load_card(acts, NOW, cfg)
     assert card.value is None and card.detail is None and card.tone == "neutral"
     assert card.note == "the Garmin feed is behind: 4 recent activities have no load yet"
+
+
+# ---- review minors ----
+
+def test_vo2max_is_not_compared_with_a_value_older_than_eight_weeks():
+    old = metrics.vo2max_card(_runs([(700, 8, 45, 58.0, 2.5, 0.0), (3, 8, 45, 52.0, 2.5, 0.0)]), NOW)
+    assert old.value == 52.0 and old.previous is None and old.tone == "neutral"
+    assert old.note == "Garmin estimate; no value from 4 to 8 weeks ago to compare"
+    near = metrics.vo2max_card(_runs([(40, 8, 45, 50.0, 2.5, 0.0), (3, 8, 45, 52.0, 2.5, 0.0)]), NOW)
+    assert near.previous == 50.0 and near.note == "Garmin estimate, vs 4 weeks ago"
+
+
+def test_on_race_day_neither_build_up_window_holds_a_race():
+    runs = _runs([(0, 21, 110, None, None, None), (3, 10, 60, None, None, None),
+                  (100, 21, 110, None, None, None), (103, 8, 50, None, None, None)])
+    runs["session_type"] = ["race", None, "race", None]
+    runs["race_name"] = [None, None, "Earlier", None]
+    plan = pd.DataFrame({"date": [NOW], "type": ["race"], "session": ["Half"], "distance_km": [21.1]})
+    ready = metrics.race_readiness(runs, plan, NOW)
+    assert ready["days_to_go"] == 0
+    assert (ready["km"], ready["longest_km"]) == (10.0, 10.0)
+    assert (ready["previous"]["km"], ready["previous"]["longest_km"]) == (8.0, 8.0)
+
+
+def test_a_hilly_road_race_counts_as_an_earlier_road_race():
+    assert metrics.race_readiness(_kind_runs("mixed", 21.0, 80), _race_plan("Half", 21.1), NOW)["previous"]
+
+
+def test_weeks_with_runs_but_no_training_effect_are_missing_not_zero():
+    runs = _runs([(0, 10, 60, None, 2.5, 0.0), (7, 8, 45, None, None, None)])
+    weekly = metrics.intensity_weekly(3, activities=runs, today=TODAY)
+    assert weekly.iloc[-1]["easy_min"] == 60.0
+    assert weekly.iloc[-2][["easy_min", "steady_min", "hard_min"]].isna().all()     # ran, not rated
+    assert weekly.iloc[-3][["easy_min", "steady_min", "hard_min"]].tolist() == [0.0, 0.0, 0.0]
+
+
+def test_a_day_with_an_activity_of_unknown_length_is_not_a_rest_day():
+    acts = _runs([(0, 5, float("nan"), None, None, None), (1, 5, 30, None, None, None)])
+    days = metrics.training_days(1, activities=acts, today=TODAY).set_index("date")
+    assert days.loc[NOW, "activities"] == 1 and days.loc[NOW, "minutes"] == 0.0
+    assert days.loc[NOW + pd.Timedelta(days=1), "activities"] == 0

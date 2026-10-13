@@ -104,14 +104,14 @@ def _series(values) -> tuple[float, ...]:
 
 
 def vo2max_card(runs: pd.DataFrame, now: pd.Timestamp) -> Metric | None:
-    """Garmin's VO2max estimate: the newest value against the newest one from 4 weeks ago.
+    """Garmin's VO2max estimate: the newest value against the newest one from 4 to 8 weeks ago.
 
     None when the activities carry no VO2max column at all (no Garmin input)."""
     if "vo2max" not in runs.columns:
         return None
     known = runs.dropna(subset=["vo2max"]).sort_values("date")
     recent = _last(known, now)
-    earlier = known[known["date"] <= now - pd.Timedelta(days=28)]
+    earlier = _last(known, now - pd.Timedelta(days=28))       # 4 to 8 weeks ago, nothing older
     value = clean(recent["vo2max"].iloc[-1]) if len(recent) else None
     previous = clean(earlier["vo2max"].iloc[-1]) if len(earlier) else None
     tone = "neutral"
@@ -119,8 +119,9 @@ def vo2max_card(runs: pd.DataFrame, now: pd.Timestamp) -> Metric | None:
         tone = "good" if value > previous else "bad"
     return Metric("vo2max", "VO2max", value, previous, "score",
                   _series(_last(known, now, days=7 * TREND_WEEKS)["vo2max"]), tone=tone,
-                  note="Garmin estimate, vs 4 weeks ago" if value is not None
-                  else "no VO2max value in the last 4 weeks")
+                  note="no VO2max value in the last 4 weeks" if value is None
+                  else "Garmin estimate, vs 4 weeks ago" if previous is not None
+                  else "Garmin estimate; no value from 4 to 8 weeks ago to compare")
 
 
 def intensity(runs: pd.DataFrame) -> pd.Series:
@@ -174,11 +175,13 @@ def intensity_weekly(weeks: int = TREND_WEEKS, *, activities: pd.DataFrame | Non
         out = pd.DataFrame(0.0, index=all_weeks, columns=columns)
     else:
         week = runs["date"] - pd.to_timedelta(runs["date"].dt.weekday, unit="D")
-        out = (runs.assign(week_start=week, kind=intensity(runs)).dropna(subset=["kind"])
-               .pivot_table(index="week_start", columns="kind", values="duration_min",
-                            aggfunc="sum", fill_value=0.0)
+        rated = runs.assign(week_start=week, kind=intensity(runs)).dropna(subset=["kind"])
+        out = (rated.pivot_table(index="week_start", columns="kind", values="duration_min",
+                                 aggfunc="sum", fill_value=0.0)
                .reindex(index=all_weeks, columns=list(INTENSITIES), fill_value=0.0))
         out.columns = columns
+        # a week with runs and none of them rated is unknown, not a week without running
+        out.loc[out.index.isin(week) & ~out.index.isin(rated["week_start"])] = float("nan")
     return out.astype("float64").rename_axis("week_start").reset_index()
 
 
@@ -304,7 +307,7 @@ def streak_card(runs: pd.DataFrame, now: pd.Timestamp) -> Metric:
 
 def training_days(weeks: int = TREND_WEEKS, *, activities: pd.DataFrame | None = None,
                   today=None, cfg: Config | None = None) -> pd.DataFrame:
-    """Minutes of activity (every sport) per day over whole weeks, Monday first.
+    """Minutes and number of activities (every sport) per day over whole weeks, Monday first.
 
     Days after today are NaN: they have not happened, which is not the same as a rest day."""
     acts = activities if activities is not None else _load(cfg=cfg or load_config())
@@ -313,7 +316,9 @@ def training_days(weeks: int = TREND_WEEKS, *, activities: pd.DataFrame | None =
     dates = pd.date_range(monday - pd.Timedelta(weeks=weeks - 1), periods=7 * weeks, freq="D")
     minutes = acts.groupby("date")["duration_min"].sum().reindex(dates, fill_value=0.0)
     minutes[minutes.index > now] = float("nan")
-    return pd.DataFrame({"date": dates, "minutes": minutes.to_numpy(dtype="float64")})
+    count = acts.groupby("date").size().reindex(dates, fill_value=0)
+    return pd.DataFrame({"date": dates, "minutes": minutes.to_numpy(dtype="float64"),
+                         "activities": count.to_numpy(dtype="int64")})
 
 
 def build_weeks(distance_km: float | None) -> int:
@@ -348,8 +353,10 @@ def race_readiness(runs: pd.DataFrame, plan: pd.DataFrame | None, now: pd.Timest
     days_to_go = int((race["date"] - now).days)
     distance = clean(race.get("distance_km"))
     weeks = build_weeks(distance)
+    # On race day both windows end the day before, so neither holds a race.
+    gap = pd.Timedelta(days=1 if days_to_go == 0 else 0)
     out = {"race": str(race["session"]), "date": race["date"], "days_to_go": days_to_go,
-           "weeks": weeks, **_build_up(runs, now, weeks), "previous": None}
+           "weeks": weeks, **_build_up(runs, now - gap, weeks), "previous": None}
     if distance is None or "session_type" not in runs.columns:
         return out
     surface = race.get("surface")
@@ -358,7 +365,8 @@ def race_readiness(runs: pd.DataFrame, plan: pd.DataFrame | None, now: pd.Timest
     similar = runs[(runs["session_type"] == "race") & (runs["date"] < now)
                    & ((runs["distance_km"] - distance).abs() <= share * distance)]
     if "surface" in runs.columns:
-        similar = similar[(similar["surface"] != "road") if trail else (similar["surface"] == "road")]
+        # "mixed" is a hilly run on the road sport type: it can stand for either kind
+        similar = similar[similar["surface"] != ("road" if trail else "trail")]
     climb = clean(race.get("elevation_m"))
     if climb is not None and "elevation_m" in runs.columns:
         allowed = TRAIL_RACE_SHARE * climb if trail else ROAD_RACE_CLIMB_M
@@ -369,7 +377,7 @@ def race_readiness(runs: pd.DataFrame, plan: pd.DataFrame | None, now: pd.Timest
     name = last.get("race_name")
     out["previous"] = {"name": name if isinstance(name, str) and name else f"{last['date']:%d %b %Y}",
                        "date": last["date"],
-                       **_build_up(runs, last["date"] - pd.Timedelta(days=days_to_go), weeks)}
+                       **_build_up(runs, last["date"] - pd.Timedelta(days=days_to_go) - gap, weeks)}
     return out
 
 

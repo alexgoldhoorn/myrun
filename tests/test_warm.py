@@ -59,3 +59,16 @@ def test_the_loop_warms_until_stopped_and_survives_a_bad_config(cfg):
 def test_the_command_line_is_handed_to_streamlit_unchanged():
     assert warm.streamlit_argv(["warm.py", "run", "app/Dashboard.py", "--server.port", "8501"]) == [
         "streamlit", "run", "app/Dashboard.py", "--server.port", "8501"]
+
+
+def test_a_refreshing_warm_up_recomputes_the_timed_results_and_only_those(cfg, monkeypatch):
+    warm.warm(cfg)
+    computed = []
+    for name in list(common.COMPUTE):
+        real = common.COMPUTE[name]
+        monkeypatch.setitem(common.COMPUTE, name,
+                            lambda *a, name=name, real=real: computed.append(name) or real(*a))
+    warm.warm(cfg)
+    assert computed == []                                    # a plain warm-up: all hits
+    warm.warm(cfg, refresh=True)
+    assert sorted(computed) == sorted(common.CLOCKED)
