@@ -175,7 +175,9 @@ def test_dashboard_opens_a_run_on_the_activity_page(baseline):
 
 def test_trends_page_content(everything):
     text = _text(run_page("pages/1_Trends.py"))
-    for heading in ("Aerobic efficiency", "Volume", "Best efforts", "Races", "Wellness"):
+    for heading in ("Aerobic efficiency", "Volume", "Best efforts", "Races", "Wellness",
+                    "Like for like, year on year", "heart rate by pace band",
+                    "Training mix per year"):
         assert heading in text
 
 

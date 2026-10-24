@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from myrun import dynamics, fmt, links, metrics, optional, trends
+from myrun import bands, dynamics, fmt, links, metrics, optional, trends
 from myrun.config import RUN_SPORTS
 from myrun.ui import charts, common, theme
 
@@ -43,6 +43,43 @@ else:
                                    hover_data={"n_runs": True, "median_pace": True}), height=320)
 
     st.plotly_chart(common.figure("efficiency", cfg, _efficiency_figure))
+
+# ---- like for like: HR by pace band, per year ------------------------------
+st.subheader("Like for like, year on year")
+st.caption("Is a lower heart rate fitness, or an easier mix and more trail? Runs are compared "
+           "only with runs of the same surface and grade-adjusted pace band. Each run counts "
+           "by its core (first and last km and lap dropped); races, intervals and unsteady "
+           "workout-lap runs are left out. Open markers: fewer than "
+           f"{bands.NOISY_RUNS} runs in that cell.")
+picked = st.multiselect("Only these months each year (same season)", list(range(1, 13)),
+                        format_func=lambda m: pd.Timestamp(2000, m, 1).strftime("%b"))
+season = tuple(sorted(picked)) or None
+this_year = pd.Timestamp.today().year
+first_year = st.slider("From year", this_year - 10, this_year, this_year - 5)
+
+yearly_eff = bands.since_year(common.cached("efficiency_yearly", cfg, season), first_year, "year")
+if len(yearly_eff):
+    st.markdown("**Aerobic efficiency per year** (easy flat road runs, monthly medians "
+                "weighted by run count)")
+    st.plotly_chart(common.figure("efficiency_yearly", cfg,
+                                  lambda: charts.efficiency_year_bars(yearly_eff),
+                                  season, first_year))
+
+band_cells = bands.since_year(common.cached("band_table", cfg, "year", season), first_year)
+for surface in bands.SURFACES:
+    cells = band_cells[band_cells["surface"] == surface]
+    if cells.empty:
+        continue
+    st.markdown(f"**{surface.title()}: heart rate by pace band**")
+    st.plotly_chart(common.figure(
+        "band_hr", cfg, lambda: charts.band_hr_lines(cells, bands.PACE_BANDS),
+        surface, season, first_year), key=f"band-hr-{surface}")
+
+mix = bands.since_year(common.cached("intensity_yearly", cfg, season), first_year, "year")
+if len(mix):
+    st.markdown("**Training mix per year** (share of running minutes, Garmin training effect)")
+    st.plotly_chart(common.figure("intensity_yearly", cfg,
+                                  lambda: charts.intensity_share_bars(mix), season, first_year))
 
 # ---- volume ---------------------------------------------------------------
 st.subheader("Volume")

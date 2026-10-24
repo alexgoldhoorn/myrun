@@ -162,3 +162,45 @@ def easy_pace_line(weekly: pd.DataFrame) -> go.Figure:
     fig.update_yaxes(autorange="reversed",
                      **(dict(tickmode="array", tickvals=vals, ticktext=text) if vals else {}))
     return fig
+
+
+def efficiency_year_bars(yearly: pd.DataFrame) -> go.Figure:
+    """Aerobic efficiency per year; the run count is in the hover."""
+    fig = go.Figure(go.Bar(x=[str(y) for y in yearly["year"]], y=list(yearly["efficiency"]),
+                           customdata=list(zip(yearly["n_runs"], yearly["n_months"])),
+                           hovertemplate="%{x}<br>%{y:.3f} m/beat<br>%{customdata[0]} runs in "
+                                         "%{customdata[1]} months<extra></extra>"))
+    theme.style(fig, height=280)
+    low = float(yearly["efficiency"].min()) if len(yearly) else 0.0
+    fig.update_layout(yaxis_title="m per heartbeat", xaxis_title=None)
+    fig.update_yaxes(range=[low * 0.9, None])
+    return fig
+
+
+def band_hr_lines(table: pd.DataFrame, bands_order) -> go.Figure:
+    """Mean heart rate per pace band, one line per year; noisy cells are open markers."""
+    fig = go.Figure()
+    for year, rows in table.groupby("period"):
+        rows = rows.set_index("band").reindex([b for b in bands_order if b in set(rows["band"])])
+        fig.add_trace(go.Scatter(
+            x=list(rows.index), y=list(rows["mean_hr"]), name=str(year), mode="lines+markers",
+            marker_symbol=["circle-open" if n else "circle" for n in rows["noisy"]],
+            customdata=list(zip(rows["n_runs"], rows["hr_pct_max"], rows["temp_c"])),
+            hovertemplate=f"{year} · %{{x}}/km<br>HR %{{y:.0f}} (%{{customdata[1]:.0f}} % max)"
+                          "<br>%{customdata[0]} runs, %{customdata[2]:.0f} °C<extra></extra>"))
+    theme.style(fig, height=320)
+    fig.update_layout(yaxis_title="Mean HR (bpm)", xaxis_title="Grade-adjusted pace (min/km)")
+    fig.update_xaxes(categoryorder="array", categoryarray=list(bands_order))
+    return fig
+
+
+def intensity_share_bars(yearly: pd.DataFrame) -> go.Figure:
+    """Share of running minutes per year by session intensity, stacked to 100 %."""
+    fig = go.Figure()
+    for kind in ("easy", "steady", "hard"):
+        fig.add_trace(go.Bar(x=[str(y) for y in yearly["year"]], y=list(yearly[f"{kind}_pct"]),
+                             name=kind,
+                             hovertemplate="%{x}<br>%{y:.0f} % " + kind + "<extra></extra>"))
+    theme.style(fig, height=280)
+    fig.update_layout(barmode="stack", yaxis_title="% of running minutes", xaxis_title=None)
+    return fig
