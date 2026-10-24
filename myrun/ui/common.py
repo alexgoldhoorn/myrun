@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from myrun import dynamics, links, metrics, optional, streams, trends
+from myrun import bands, dynamics, links, metrics, optional, streams, trends
 from myrun.activities import activities
 from myrun.config import RUN_SPORTS, Config, ConfigError, load_config
 from myrun.hr import hr_settings
@@ -122,6 +122,12 @@ COMPUTE = {
     "laps": lambda cfg, activity_id: streams.activity_laps(activity_id, cfg=cfg),
     "drift": lambda cfg, activity_id: streams.drift_pct(cached("streams", cfg, activity_id)),
     "activity_dynamics": _activity_dynamics,
+    "band_runs": lambda cfg: bands.band_runs(activities=load_activities(cfg), cfg=cfg),
+    "band_table": lambda cfg, by, season: bands.band_table(cached("band_runs", cfg), by, season),
+    "efficiency_yearly": lambda cfg, season: bands.yearly_efficiency(
+        activities=load_activities(cfg), cfg=cfg, season=season),
+    "intensity_yearly": lambda cfg, season: bands.intensity_yearly(
+        activities=load_activities(cfg), cfg=cfg, season=season),
 }
 
 

@@ -1,6 +1,7 @@
 """Plain-text reports of the library's numbers, for a chat assistant rather than a page.
 
-`python -m myrun.report fitness|race|dashboard|status` prints one report. Each is built
+`python -m myrun.report fitness|race|dashboard|status` prints one report; `fitness --by-band`
+prints the like-for-like comparison (heart rate by surface and pace band, per year). Each is built
 from the same library calls as the dashboard, so the two never disagree. A missing input
 gives a line that says so, never a zero.
 """
@@ -12,6 +13,7 @@ from datetime import date
 
 import pandas as pd
 
+from myrun import bands
 from myrun.activities import activities as _load
 from myrun.config import RUN_SPORTS, Config, load_config
 from myrun.hr import hr_settings
@@ -125,6 +127,89 @@ def fitness(months: int = DEFAULT_MONTHS, *, cfg: Config | None = None,
         for month, row in monthly.iterrows():
             out.append(f"- {month:%Y-%m}: resting HR {_num(row.resting_hr, 0, ' bpm')}, "
                        f"HRV {_num(row.hrv_ms, 0, ' ms')}")
+    return "\n".join(out)
+
+
+def _cell(row) -> str:
+    return (f"{row.n_runs} run{'s' if row.n_runs != 1 else ''}, {_num(row.km, 0)} km, "
+            f"HR {_num(row.mean_hr, 0)} ({_num(row.hr_pct_max, 0)} % max), "
+            f"{_num(row.speed_per_beat, 2)} m/beat, {_num(row.temp_c, 0, ' °C')}"
+            + (" [noisy]" if row.noisy else ""))
+
+
+def _season_label(season: tuple[int, ...] | None) -> str:
+    return "all months" if not season else "months " + ",".join(str(m) for m in season)
+
+
+def fitness_by_band(months: int = DEFAULT_MONTHS, *, first_year: int | None = None,
+                    season: tuple[int, ...] | None = None, cfg: Config | None = None,
+                    activities: pd.DataFrame | None = None, today=None) -> str:
+    """Heart rate by surface and pace band per year (and per month for the last `months`),
+    aerobic efficiency per year, and the easy/steady/hard mix per year."""
+    cfg = cfg or load_config()
+    acts = activities if activities is not None else _load(cfg=cfg)
+    now = pd.Timestamp(today if today is not None else date.today()).normalize()
+    first_year = first_year if first_year is not None else bands.default_first_year(now)
+    runs = bands.band_runs(activities=acts, cfg=cfg, today=now)
+    heart = hr_settings(cfg, acts, now)
+    threshold, threshold_source = bands.trail_threshold(acts[acts["sport"].isin(RUN_SPORTS)])
+    out = [f"FITNESS BY PACE BAND, {first_year} to {now.year}, {_season_label(season)}",
+           "Each run's core (first and last km and lap dropped), grade-adjusted pace; "
+           "races, intervals and unsteady runs left out. Compare a band with itself across "
+           "years: a lower HR in the same band and surface is fitness, not an easier mix.",
+           f"- max HR {heart.max_hr or 'n/a'} ({heart.source}); untagged runs count as trail "
+           f"from {threshold:g} m climb/km ({threshold_source}), only in years without "
+           f"TrailRun; cells under {bands.NOISY_RUNS} runs are [noisy]"]
+
+    shown = runs[runs["year"] >= first_year]
+    if season:
+        shown = shown[shown["date"].dt.month.isin(season)]
+    counts = shown["excluded"].fillna("kept").value_counts()
+    out.append("- runs: " + ", ".join(f"{name} {n}" for name, n in counts.items()))
+
+    yearly = bands.since_year(bands.band_table(runs, "year", season), first_year)
+    for surface in bands.SURFACES:
+        cells = yearly[yearly["surface"] == surface]
+        out.append(f"\n{surface.title()}, per year (band: runs, km, HR, % of max, speed per beat, "
+                   "start temperature):")
+        if cells.empty:
+            out.append("- no qualifying runs")
+        for band in bands.PACE_BANDS:
+            rows = cells[cells["band"] == band]
+            if rows.empty:
+                continue
+            out.append(f"- {band}/km:")
+            out.extend(f"  - {int(row.period)}: {_cell(row)}" for row in rows.itertuples())
+
+    first_month = (now - pd.DateOffset(months=months - 1)).to_period("M").start_time
+    monthly = bands.band_table(runs, "month", season)
+    monthly = monthly[monthly["period"] >= first_month]
+    out.append(f"\nPer month, {first_month:%Y-%m} to {now:%Y-%m}:")
+    if monthly.empty:
+        out.append("- no qualifying runs")
+    for row in monthly.itertuples():
+        out.append(f"- {row.period:%Y-%m} {row.surface} {row.band}: {_cell(row)}")
+
+    out.append("\nAerobic efficiency per year, easy flat road runs (monthly medians weighted "
+               "by run count; higher = faster at the same heart rate):")
+    efficiency = bands.yearly_efficiency(activities=acts, cfg=cfg, season=season)
+    efficiency = efficiency[efficiency["year"] >= first_year]
+    if efficiency.empty:
+        out.append("- no comparable easy runs")
+    for row in efficiency.itertuples():
+        noisy = " [noisy]" if row.n_runs < bands.NOISY_RUNS else ""
+        out.append(f"- {row.year}: {_num(row.efficiency, 3)} m/beat ({row.n_runs} runs in "
+                   f"{row.n_months} months){noisy}")
+
+    out.append("\nIntensity mix per year (share of running minutes, Garmin training effect):")
+    mix = bands.intensity_yearly(activities=acts, cfg=cfg, season=season)
+    mix = mix[mix["year"] >= first_year]
+    if mix.empty:
+        out.append("- no training effect values (needs the Garmin activity feed)")
+    for row in mix.itertuples():
+        out.append(f"- {row.year}: easy {_num(row.easy_pct, 0)} %, steady "
+                   f"{_num(row.steady_pct, 0)} %, hard {_num(row.hard_pct, 0)} % "
+                   f"({_num(row.rated_pct, 0)} % of minutes rated)")
     return "\n".join(out)
 
 
@@ -243,10 +328,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("report", choices=("fitness", "race", "dashboard", "status"))
     parser.add_argument("--months", type=int, default=DEFAULT_MONTHS)
     parser.add_argument("--weeks", type=int, default=DEFAULT_WEEKS)
+    parser.add_argument("--by-band", action="store_true",
+                        help="fitness: heart rate by surface and pace band, per year and month")
+    parser.add_argument("--from-year", type=int, default=None,
+                        help="fitness --by-band: first year shown (default: five years back)")
+    parser.add_argument("--season", default="",
+                        help="fitness --by-band: only these months, e.g. 9-10 or 9,10 or 11-2")
     args = parser.parse_args(argv)
     if not 1 <= args.months <= 120 or not 1 <= args.weeks <= 104:
         parser.error("--months must be 1-120 and --weeks 1-104")
-    if args.report == "fitness":
+    if args.from_year is not None and not 2000 <= args.from_year <= 2100:
+        parser.error("--from-year must be a year like 2021")
+    try:
+        season = bands.parse_season(args.season)
+    except ValueError as exc:
+        parser.error(str(exc))
+    if args.report == "fitness" and args.by_band:
+        text = fitness_by_band(args.months, first_year=args.from_year, season=season)
+    elif args.report == "fitness":
         text = fitness(args.months)
     elif args.report == "race":
         text = race(args.weeks)

@@ -24,7 +24,9 @@ WARM = (("input_states",), ("plan",), ("wellness",), ("races",), ("races_linked"
         ("hr_settings",), ("headline",),
         ("weekly_load", 12), ("weekly_runs", 12), ("plan_vs_actual",), ("efficiency",),
         ("volume", "month"), ("best_efforts",), ("vo2max_trend",), ("intensity_weekly", 12),
-        ("shoes",), ("training_days", 12), ("race_readiness",))
+        ("shoes",), ("training_days", 12), ("race_readiness",),
+        ("band_runs",), ("band_table", "year", None), ("efficiency_yearly", None),
+        ("intensity_yearly", None))
 
 log = logging.getLogger("myrun.warm")
 
