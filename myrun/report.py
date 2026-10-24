@@ -130,8 +130,12 @@ def fitness(months: int = DEFAULT_MONTHS, *, cfg: Config | None = None,
     return "\n".join(out)
 
 
+def _plural(n: int, word: str) -> str:
+    return f"{n} {word}{'' if n == 1 else 's'}"
+
+
 def _cell(row) -> str:
-    return (f"{row.n_runs} run{'s' if row.n_runs != 1 else ''}, {_num(row.km, 0)} km, "
+    return (f"{_plural(row.n_runs, 'run')}, {_num(row.km, 0)} km, "
             f"HR {_num(row.mean_hr, 0)} ({_num(row.hr_pct_max, 0)} % max), "
             f"{_num(row.speed_per_beat, 2)} m/beat, {_num(row.temp_c, 0, ' °C')}"
             + (" [noisy]" if row.noisy else ""))
@@ -198,8 +202,8 @@ def fitness_by_band(months: int = DEFAULT_MONTHS, *, first_year: int | None = No
         out.append("- no comparable easy runs")
     for row in efficiency.itertuples():
         noisy = " [noisy]" if row.n_runs < bands.NOISY_RUNS else ""
-        out.append(f"- {row.year}: {_num(row.efficiency, 3)} m/beat ({row.n_runs} runs in "
-                   f"{row.n_months} months){noisy}")
+        out.append(f"- {row.year}: {_num(row.efficiency, 3)} m/beat ({_plural(row.n_runs, 'run')} "
+                   f"in {_plural(row.n_months, 'month')}){noisy}")
 
     out.append("\nIntensity mix per year (share of running minutes, Garmin training effect):")
     mix = bands.intensity_yearly(activities=acts, cfg=cfg, season=season)
