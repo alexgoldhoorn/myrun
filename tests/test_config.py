@@ -120,3 +120,12 @@ def test_hr_sensors_worn(tmp_path):
     assert cfg.hr_sensors_worn == "hard"
     with pytest.raises(ConfigError):
         load_config(_write(tmp_path, "strava_db: /d.db\nhr: {sensors_worn: sometimes}\n"))
+
+
+def test_devices_owned_from(tmp_path):
+    from datetime import date
+    cfg = load_config(_write(tmp_path, "strava_db: /d.db\ndevices:\n"
+                             "  - {name: Garmin Forerunner 965, owned_from: 2024-07-25}\n"))
+    assert cfg.device_owned_from == {"Garmin Forerunner 965": date(2024, 7, 25)}
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, "strava_db: /d.db\ndevices: [{name: x}]\n"))

@@ -27,6 +27,7 @@ SELECT activityId AS activity_id,
        averageCadence AS cadence,
        movingTimeInSeconds AS moving_s,
        workoutType AS workout_type,
+       deviceName AS device,
        COALESCE(streamsAreImported, 0) AS has_streams,
        CASE WHEN json_valid(data) THEN json_extract(data, '$.suffer_score') END AS relative_effort,
        CASE WHEN json_valid(weather) THEN json_extract(weather, '$.temperature_2m') END AS temp_c,
@@ -57,6 +58,8 @@ def activities(sports=None, since=None, *, cfg: Config | None = None) -> pd.Data
     df["hour"] = df["start"].dt.hour + df["start"].dt.minute / 60
     df["year"] = df["start"].dt.year
     df["has_streams"] = df["has_streams"].astype(bool)
+    for device, owned_from in cfg.device_owned_from.items():   # the previous owner's activities
+        df = df[~((df["device"] == device) & (df["date"] < pd.Timestamp(owned_from)))]
 
     df["distance_km"] = df.pop("distance_m") / 1000
     df["duration_min"] = df.pop("moving_s") / 60
