@@ -171,6 +171,19 @@ def fitness_by_band(months: int = DEFAULT_MONTHS, *, first_year: int | None = No
     counts = shown["excluded"].fillna("kept").value_counts()
     out.append("- runs: " + ", ".join(f"{name} {n}" for name, n in counts.items()))
 
+    gear = bands.gear_yearly(runs[runs["year"] >= first_year], season)
+    out.append("\nWatch and HR sensor per year (share of the runs kept; a step in HR that lines "
+               "up with a change of watch or strap can be the sensor, not fitness):")
+    if gear.empty:
+        out.append("- no qualifying runs")
+    for row in gear.itertuples():
+        watches = ", ".join(f"{name} {_num(pct, 0)} %" for name, pct in row.watches.items())
+        line = f"- {row.year}: {watches}"
+        if cfg.hr_sensors:
+            line += "; HR " + ", ".join(f"{name} {_num(pct, 0)} %"
+                                        for name, pct in row.sensors.items())
+        out.append(line)
+
     yearly = bands.since_year(bands.band_table(runs, "year", season), first_year)
     for surface in bands.SURFACES:
         cells = yearly[yearly["surface"] == surface]

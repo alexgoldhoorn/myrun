@@ -16,6 +16,23 @@ def test_pace_band_edges_go_to_the_slower_band():
         ">7:00", None]
 
 
+def test_hr_sensor_is_the_latest_one_in_use():
+    from datetime import date
+    dates = pd.Series(pd.to_datetime(["2020-06-01", "2021-01-01", "2023-05-01"]))
+    sensors = ((date(2023, 4, 11), "strap 2"), (date(2020, 12, 30), "strap 1"))
+    assert list(bands.hr_sensor(dates, sensors)) == [None, "strap 1", "strap 2"]
+
+
+def test_gear_yearly_shares_per_watch_and_sensor():
+    rows = _band_rows().assign(device=["Forerunner 945", "Forerunner 965", "Forerunner 945",
+                                       "Forerunner 965"], hr_sensor=[None, "strap", "strap", "strap"])
+    rows.loc[3, "excluded"] = "race"
+    out = bands.gear_yearly(rows).set_index("year")
+    assert list(out.index) == [2024] and out.loc[2024, "n_runs"] == 3
+    assert out.loc[2024, "watches"]["Forerunner 945"] == pytest.approx(200 / 3)
+    assert out.loc[2024, "sensors"] == pytest.approx({"strap": 200 / 3, "none set": 100 / 3})
+
+
 @pytest.mark.parametrize("text, months", [("", None), ("9-10", (9, 10)), ("9,10", (9, 10)),
                                           ("11-2", (11, 12, 1, 2)), (" 3 ", (3,))])
 def test_parse_season(text, months):
@@ -144,9 +161,17 @@ def test_report_by_band_has_every_section(cfg, tmp_path):
     full = replace(cfg, garmin_activities=write_garmin_csv(tmp_path / "g.csv"))
     text = report.fitness_by_band(12, cfg=full, today=TODAY, first_year=2020)
     assert text.startswith("FITNESS BY PACE BAND, 2020 to 2026, all months")
+    assert "Watch and HR sensor per year" in text and "Forerunner 965" in text
     for heading in ("Road, per year", "Trail, per year", "Per month", "Aerobic efficiency per year",
                     "Intensity mix per year", "- runs: "):
         assert heading in text
+
+
+def test_report_by_band_names_the_hr_sensor_when_configured(cfg):
+    from datetime import date
+    text = report.fitness_by_band(12, cfg=replace(cfg, hr_sensors=((date(2000, 1, 1), "strap 1"),)),
+                                  today=TODAY, first_year=2020)
+    assert "; HR strap 1 100 %" in text
 
 
 def test_report_cli_by_band_and_bad_season(cfg, monkeypatch, capsys):

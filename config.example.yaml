@@ -48,6 +48,8 @@ hr:                                   # all optional. With nothing set, the maxi
   # max_hr: 180                       # your maximum heart rate, if you know it
   # zone_upper_bounds: [125, 145, 160, 172]   # upper bpm of zones 1 to 4; overrides max_hr
   # easy_band: [125, 148]             # average HR that counts as an easy run
+  # sensors:                          # HR straps, so a change shows in the by-band report
+  #   - {since: 2021-01-01, name: strap 1}
 
 thresholds:
   # mixed_hilliness_m_per_km: 15    # label a Run that climbs this much per km as "mixed"

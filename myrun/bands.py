@@ -56,6 +56,10 @@ WHERE s.unitSystem = 'metric' AND COALESCE(a.markedForDeletion, 0) != 1
   AND a.sportType IN ({sports})
 ORDER BY s.activityId, s.splitNumber
 """
+_DEVICES_SQL = """
+SELECT activityId AS activity_id, deviceName AS device FROM Activity
+WHERE COALESCE(markedForDeletion, 0) != 1 AND sportType IN ({sports})
+"""
 
 
 def pace_band(pace_min_km: pd.Series) -> pd.Series:
@@ -113,16 +117,20 @@ def surfaces(runs: pd.DataFrame, threshold: float) -> pd.Series:
     return out
 
 
-def _read(cfg: Config) -> tuple[pd.DataFrame, pd.DataFrame]:
+def _read(cfg: Config) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     marks = ",".join("?" for _ in RUN_SPORTS)
     with closing(open_db(cfg)) as conn:
         laps = pd.read_sql_query(_LAPS_SQL.format(sports=marks), conn, params=list(RUN_SPORTS))
         splits = pd.read_sql_query(_SPLITS_SQL.format(sports=marks), conn, params=list(RUN_SPORTS))
+        devices = pd.read_sql_query(_DEVICES_SQL.format(sports=marks), conn,
+                                    params=list(RUN_SPORTS))
+    devices["activity_id"] = devices["activity_id"].astype(str)
+    devices["device"] = devices["device"].str.replace(r"^Garmin ", "", regex=True)
     for frame in (laps, splits):
         for column in frame.columns.drop("activity_id"):
             frame[column] = pd.to_numeric(frame[column], errors="coerce").astype("float64")
         frame["activity_id"] = frame["activity_id"].astype(str)
-    return laps, splits
+    return laps, splits, devices
 
 
 def _core(frame: pd.DataFrame, key: str, minimum: int) -> pd.DataFrame:
@@ -180,7 +188,7 @@ def band_runs(*, activities: pd.DataFrame | None = None, cfg: Config | None = No
     runs = acts[acts["sport"].isin(RUN_SPORTS)].copy()
     columns = ["activity_id", "date", "year", "month", "sport", "surface_band", "distance_km",
                "temp_c", "core_hr", "hr_pct_max", "pace_min_km", "pace_source", "band",
-               "speed_per_beat", "lap_cv", "workout_laps", "excluded"]
+               "speed_per_beat", "lap_cv", "workout_laps", "device", "hr_sensor", "excluded"]
     if runs.empty:
         return pd.DataFrame(columns=columns)
     runs["activity_id"] = runs["activity_id"].astype(str)
@@ -188,8 +196,10 @@ def band_runs(*, activities: pd.DataFrame | None = None, cfg: Config | None = No
     runs["surface_band"] = surfaces(runs, threshold)
     runs["month"] = runs["date"].dt.to_period("M").dt.start_time
 
-    laps, splits = _read(cfg)
+    laps, splits, devices = _read(cfg)
     runs = runs.merge(core_stats(laps, splits), on="activity_id", how="left")
+    runs = runs.merge(devices, on="activity_id", how="left")
+    runs["hr_sensor"] = hr_sensor(runs["date"], cfg.hr_sensors)
     flat_road = (runs["surface_band"] == "road") & (
         runs["hilliness_m_km"] < cfg.efficiency_max_hilliness_m_per_km)
     runs["pace_min_km"] = runs["gap_pace_min_km"]
@@ -225,6 +235,35 @@ def band_runs(*, activities: pd.DataFrame | None = None, cfg: Config | None = No
     runs["band"] = pace_band(runs["pace_min_km"])
     runs["speed_per_beat"] = 1000 / runs["pace_min_km"] / runs["core_hr"]
     return runs[columns].reset_index(drop=True)
+
+
+def hr_sensor(dates: pd.Series, sensors: tuple[tuple[date, str], ...]) -> pd.Series:
+    """The configured heart-rate sensor in use on each date; None before the first one."""
+    out = pd.Series([None] * len(dates), index=dates.index, dtype=object)
+    for since, name in sorted(sensors):
+        out[dates >= pd.Timestamp(since)] = name
+    return out
+
+
+def gear_yearly(runs: pd.DataFrame, season: tuple[int, ...] | None = None) -> pd.DataFrame:
+    """Per year, the share of kept runs per watch and per configured HR sensor. A sensor
+    change can shift heart rate by a few bpm, so a step that lines up with one is not fitness."""
+    kept = runs[runs["excluded"].isna()]
+    if season:
+        kept = kept[kept["date"].dt.month.isin(season)]
+    columns = ["year", "n_runs", "watches", "sensors"]
+    if kept.empty:
+        return pd.DataFrame(columns=columns)
+
+    def shares(values: pd.Series, missing: str) -> dict[str, float]:
+        counts = values.fillna(missing).value_counts()
+        return {name: 100 * n / counts.sum() for name, n in counts.items()}
+
+    rows = [{"year": int(year), "n_runs": len(group),
+             "watches": shares(group["device"], "unknown"),
+             "sensors": shares(group["hr_sensor"], "none set")}
+            for year, group in kept.groupby("year")]
+    return pd.DataFrame(rows, columns=columns)
 
 
 def band_table(runs: pd.DataFrame, by: str = "year", season: tuple[int, ...] | None = None
