@@ -49,7 +49,9 @@ st.subheader("Like for like, year on year")
 st.caption("Is a lower heart rate fitness, or an easier mix and more trail? Runs are compared "
            "only with runs of the same surface and grade-adjusted pace band. Each run counts "
            "by its core (first and last km and lap dropped); races, intervals and unsteady "
-           "workout-lap runs are left out. Open markers: fewer than "
+           "workout-lap runs are left out. Heart rate is corrected for a change of watch "
+           "where enough runs on both watches allow fitting the offset (see the fitness "
+           "report). Open markers: fewer than "
            f"{bands.NOISY_RUNS} runs in that cell.")
 picked = st.multiselect("Only these months each year (same season)", list(range(1, 13)),
                         format_func=lambda m: pd.Timestamp(2000, m, 1).strftime("%b"))

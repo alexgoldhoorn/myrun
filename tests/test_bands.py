@@ -23,6 +23,24 @@ def test_hr_sensor_is_the_latest_one_in_use():
     assert list(bands.hr_sensor(dates, sensors)) == [None, "strap 1", "strap 2"]
 
 
+def _paired(n_old, n_new, gap):
+    dates = pd.to_datetime(["2024-08-01"] * (n_old + n_new))
+    return pd.DataFrame({"date": dates, "surface_band": "road", "band": "5:00–5:30",
+                         "device": ["Forerunner 945"] * n_old + ["Forerunner 965"] * n_new,
+                         "core_hr_raw": [140.0] * n_old + [140.0 - gap] * n_new,
+                         "excluded": None})
+
+
+def test_watch_offsets_fits_the_switch_from_paired_runs():
+    out = bands.watch_offsets(_paired(8, 20, 5)).set_index("device")
+    assert out.loc["Forerunner 965", "applied_bpm"] == pytest.approx(5)
+    assert out.loc["Forerunner 965", "reference"] == "Forerunner 945"
+
+
+def test_watch_offsets_needs_enough_paired_runs():
+    assert bands.watch_offsets(_paired(bands.MIN_PAIRED_RUNS - 1, 20, 5)).empty
+
+
 def test_gear_yearly_shares_per_watch_and_sensor():
     rows = _band_rows().assign(device=["Forerunner 945", "Forerunner 965", "Forerunner 945",
                                        "Forerunner 965"], hr_sensor=[None, "strap", "strap", "strap"])
@@ -175,7 +193,7 @@ def test_report_by_band_names_the_hr_sensor_when_configured(cfg):
     text = report.fitness_by_band(12, cfg=replace(cfg, hr_sensors=((date(2000, 1, 1), "strap 1"),),
                                                   hr_sensors_worn="hard"),
                                   today=TODAY, first_year=2020)
-    assert "worn on hard runs only" in text
+    assert "worn on hard runs only" in text and "no watch HR correction" in text
 
 
 def test_report_cli_by_band_and_bad_season(cfg, monkeypatch, capsys):

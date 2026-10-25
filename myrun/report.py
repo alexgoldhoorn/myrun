@@ -186,6 +186,21 @@ def fitness_by_band(months: int = DEFAULT_MONTHS, *, first_year: int | None = No
     if cfg.hr_sensors and cfg.hr_sensors_worn == "hard":
         out.append("- the strap is worn on hard runs only, so most runs here are wrist HR from "
                    "the watch: a change of watch is a change of HR sensor")
+    offsets = bands.watch_offsets(runs)
+    for row in offsets.itertuples():
+        chained = ("" if row.applied_bpm == row.offset_bpm
+                   else f", {row.offset_bpm:+.1f} against the {row.reference} plus the chain")
+        out.append(f"- HR corrected: {row.device} {row.applied_bpm:+.1f} bpm onto the "
+                   f"{offsets.iloc[0].reference} scale{chained} (fitted from {row.n_reference} "
+                   f"{row.reference} and {row.n_runs} {row.device} runs in the same quarter, "
+                   f"surface and pace band, {_plural(row.n_cells, 'cell')}); every HR and "
+                   "efficiency figure below includes it")
+    if offsets.empty:
+        out.append(f"- no watch HR correction: no watch switch has {bands.MIN_PAIRED_RUNS} "
+                   "runs on both watches in shared cells")
+    for device, owned_from in cfg.device_owned_from.items():
+        out.append(f"- left out everywhere: activities on the {device} before {owned_from} "
+                   "(the previous owner's)")
 
     yearly = bands.since_year(bands.band_table(runs, "year", season), first_year)
     for surface in bands.SURFACES:
@@ -212,7 +227,8 @@ def fitness_by_band(months: int = DEFAULT_MONTHS, *, first_year: int | None = No
 
     out.append("\nAerobic efficiency per year, easy flat road runs (monthly medians weighted "
                "by run count; higher = faster at the same heart rate):")
-    efficiency = bands.yearly_efficiency(activities=acts, cfg=cfg, season=season)
+    efficiency = bands.yearly_efficiency(activities=acts, cfg=cfg, season=season,
+                                         offsets=offsets)
     efficiency = efficiency[efficiency["year"] >= first_year]
     if efficiency.empty:
         out.append("- no comparable easy runs")

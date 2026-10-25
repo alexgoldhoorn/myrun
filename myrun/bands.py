@@ -34,6 +34,7 @@ MIN_CORE_SPLITS = 4            # chosen: from this many km splits, the first and
 MIN_CORE_LAPS = 3              # chosen: from this many laps, the first and last are dropped
 MIN_LAP_M = 100                # chosen: shorter laps are button presses, not running
 AUTO_LAP_M = (990, 1010)       # chosen: laps of 1 km (+-10 m) are the watch's auto-laps: no workout structure
+MIN_PAIRED_RUNS = 8            # chosen: runs needed on each watch, in shared cells, to fit an HR offset
 MAX_LAP_CV = 0.15              # chosen, from the lap data: core lap speeds of workout-lap runs varying more
                                # than this are intervals or fartlek (25 % of labelled interval sessions
                                # are under 0.144, half of long runs under 0.131)
@@ -55,10 +56,6 @@ FROM ActivitySplit s JOIN Activity a ON a.activityId = s.activityId
 WHERE s.unitSystem = 'metric' AND COALESCE(a.markedForDeletion, 0) != 1
   AND a.sportType IN ({sports})
 ORDER BY s.activityId, s.splitNumber
-"""
-_DEVICES_SQL = """
-SELECT activityId AS activity_id, deviceName AS device FROM Activity
-WHERE COALESCE(markedForDeletion, 0) != 1 AND sportType IN ({sports})
 """
 
 
@@ -117,20 +114,16 @@ def surfaces(runs: pd.DataFrame, threshold: float) -> pd.Series:
     return out
 
 
-def _read(cfg: Config) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def _read(cfg: Config) -> tuple[pd.DataFrame, pd.DataFrame]:
     marks = ",".join("?" for _ in RUN_SPORTS)
     with closing(open_db(cfg)) as conn:
         laps = pd.read_sql_query(_LAPS_SQL.format(sports=marks), conn, params=list(RUN_SPORTS))
         splits = pd.read_sql_query(_SPLITS_SQL.format(sports=marks), conn, params=list(RUN_SPORTS))
-        devices = pd.read_sql_query(_DEVICES_SQL.format(sports=marks), conn,
-                                    params=list(RUN_SPORTS))
-    devices["activity_id"] = devices["activity_id"].astype(str)
-    devices["device"] = devices["device"].str.replace(r"^Garmin ", "", regex=True)
     for frame in (laps, splits):
         for column in frame.columns.drop("activity_id"):
             frame[column] = pd.to_numeric(frame[column], errors="coerce").astype("float64")
         frame["activity_id"] = frame["activity_id"].astype(str)
-    return laps, splits, devices
+    return laps, splits
 
 
 def _core(frame: pd.DataFrame, key: str, minimum: int) -> pd.DataFrame:
@@ -188,7 +181,8 @@ def band_runs(*, activities: pd.DataFrame | None = None, cfg: Config | None = No
     runs = acts[acts["sport"].isin(RUN_SPORTS)].copy()
     columns = ["activity_id", "date", "year", "month", "sport", "surface_band", "distance_km",
                "temp_c", "core_hr", "hr_pct_max", "pace_min_km", "pace_source", "band",
-               "speed_per_beat", "lap_cv", "workout_laps", "device", "hr_sensor", "excluded"]
+               "speed_per_beat", "lap_cv", "workout_laps", "device", "hr_sensor", "core_hr_raw",
+               "hr_offset", "excluded"]
     if runs.empty:
         return pd.DataFrame(columns=columns)
     runs["activity_id"] = runs["activity_id"].astype(str)
@@ -196,9 +190,10 @@ def band_runs(*, activities: pd.DataFrame | None = None, cfg: Config | None = No
     runs["surface_band"] = surfaces(runs, threshold)
     runs["month"] = runs["date"].dt.to_period("M").dt.start_time
 
-    laps, splits, devices = _read(cfg)
+    laps, splits = _read(cfg)
     runs = runs.merge(core_stats(laps, splits), on="activity_id", how="left")
-    runs = runs.merge(devices, on="activity_id", how="left")
+    device = runs["device"] if "device" in runs else pd.Series(None, index=runs.index, dtype=object)
+    runs["device"] = device.str.replace(r"^Garmin ", "", regex=True)
     runs["hr_sensor"] = hr_sensor(runs["date"], cfg.hr_sensors)
     flat_road = (runs["surface_band"] == "road") & (
         runs["hilliness_m_km"] < cfg.efficiency_max_hilliness_m_per_km)
@@ -230,11 +225,51 @@ def band_runs(*, activities: pd.DataFrame | None = None, cfg: Config | None = No
     for mask, reason in reversed(reasons):          # the first matching reason wins
         runs.loc[mask.fillna(False).astype(bool), "excluded"] = reason
 
+    runs["band"] = pace_band(runs["pace_min_km"])
+    runs["core_hr_raw"] = runs["core_hr"]
+    offsets = watch_offsets(runs)
+    runs["hr_offset"] = runs["device"].map(offsets.set_index("device")["applied_bpm"]).fillna(0.0)
+    runs["core_hr"] = runs["core_hr_raw"] + runs["hr_offset"]
     max_hr = hr_settings(cfg, acts, today).max_hr
     runs["hr_pct_max"] = 100 * runs["core_hr"] / max_hr if max_hr else float("nan")
-    runs["band"] = pace_band(runs["pace_min_km"])
     runs["speed_per_beat"] = 1000 / runs["pace_min_km"] / runs["core_hr"]
     return runs[columns].reset_index(drop=True)
+
+
+def watch_offsets(runs: pd.DataFrame) -> pd.DataFrame:
+    """Wrist-HR offset of each watch against the one before it, fitted from runs in the same
+    quarter, surface and pace band on both watches: the mean HR difference per shared cell,
+    weighted by the smaller run count. Offsets chain back to the oldest watch of an unbroken
+    chain, so `applied_bpm` puts every run on that watch's scale. A switch with fewer than
+    MIN_PAIRED_RUNS on either side is not corrected (and breaks the chain)."""
+    columns = ["device", "reference", "offset_bpm", "applied_bpm", "n_runs", "n_reference",
+               "n_cells"]
+    kept = runs[runs["excluded"].isna() & runs["device"].notna()].copy()
+    if kept.empty:
+        return pd.DataFrame(columns=columns)
+    kept["quarter"] = kept["date"].dt.to_period("Q")
+    order = kept.groupby("device")["date"].median().sort_values().index
+    rows, applied = [], 0.0
+    for previous, device in zip(order[:-1], order[1:]):
+        cells = kept[kept["device"].isin([previous, device])].groupby(
+            ["quarter", "surface_band", "band"])
+        diffs, weights, n_dev, n_ref = [], [], 0, 0
+        for _, cell in cells:
+            ref = cell.loc[cell["device"] == previous, "core_hr_raw"]
+            new = cell.loc[cell["device"] == device, "core_hr_raw"]
+            if len(ref) and len(new):
+                diffs.append(ref.mean() - new.mean())
+                weights.append(min(len(ref), len(new)))
+                n_ref, n_dev = n_ref + len(ref), n_dev + len(new)
+        if min(n_ref, n_dev) < MIN_PAIRED_RUNS:
+            applied = 0.0
+            continue
+        offset = float(np.average(diffs, weights=weights))
+        applied += offset
+        rows.append({"device": device, "reference": previous, "offset_bpm": offset,
+                     "applied_bpm": applied, "n_runs": n_dev, "n_reference": n_ref,
+                     "n_cells": len(diffs)})
+    return pd.DataFrame(rows, columns=columns)
 
 
 def hr_sensor(dates: pd.Series, sensors: tuple[tuple[date, str], ...]) -> pd.Series:
@@ -292,11 +327,20 @@ def band_table(runs: pd.DataFrame, by: str = "year", season: tuple[int, ...] | N
 
 
 def yearly_efficiency(*, activities: pd.DataFrame | None = None, cfg: Config | None = None,
-                      season: tuple[int, ...] | None = None) -> pd.DataFrame:
+                      season: tuple[int, ...] | None = None,
+                      offsets: pd.DataFrame | None = None) -> pd.DataFrame:
     """Aerobic efficiency (easy flat road runs) per year: the monthly medians weighted by
-    their run count, optionally only over the months in `season`."""
+    their run count, optionally only over the months in `season`, with each watch's HR
+    offset applied (`offsets` from watch_offsets; fitted here when not given)."""
     cfg = cfg or load_config()
-    monthly = aerobic_efficiency(activities=activities, cfg=cfg)
+    acts = activities if activities is not None else _load(cfg=cfg)
+    if offsets is None:
+        offsets = watch_offsets(band_runs(activities=acts, cfg=cfg))
+    if not offsets.empty and "device" in acts:
+        shift = acts["device"].str.replace(r"^Garmin ", "", regex=True).map(
+            offsets.set_index("device")["applied_bpm"]).fillna(0.0)
+        acts = acts.assign(avg_hr=acts["avg_hr"] + shift)
+    monthly = aerobic_efficiency(activities=acts, cfg=cfg)
     columns = ["year", "efficiency", "n_runs", "n_months"]
     if season:
         monthly = monthly[monthly["month"].dt.month.isin(season)]

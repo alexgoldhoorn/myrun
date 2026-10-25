@@ -40,10 +40,11 @@ class Config:
     load_bands: tuple[float, float, float] = (0.8, 1.3, 1.5)
     stale_hours: float = 36.0
     garmin_join_tolerance_s: int = 120
+    device_owned_from: dict[str, date] = field(default_factory=dict)  # device -> first day it was yours
 
 
 _TOP = {"strava_db", "cache_dir", "inputs", "race_log_columns", "race_log_date_format", "wellness_columns", "links",
-        "hr", "thresholds"}
+        "hr", "thresholds", "devices"}
 _INPUTS = {"wellness_parquet", "plan_csv", "race_log_csv", "garmin_activities"}
 _OLD_INPUTS = {"garmin_activities_parquet": "garmin_activities"}   # still accepted
 _LINKS = {"statistics_for_strava_url"}
@@ -78,6 +79,18 @@ def _sensors(items, source: Path) -> tuple[tuple[date, str], ...]:
             raise ConfigError(f"{source}: each 'hr.sensors' entry needs since: YYYY-MM-DD and name")
         out.append((since, str(item["name"])))
     return tuple(sorted(out))
+
+
+def _devices(items, source: Path) -> dict[str, date]:
+    """Watches bought second hand: activities recorded on them before `owned_from` belong
+    to the previous owner (they sync into the account when the watch is first paired)."""
+    out = {}
+    for item in items if isinstance(items, list) else [items]:
+        owned = item.get("owned_from") if isinstance(item, dict) else None
+        if not isinstance(owned, date) or not item.get("name"):
+            raise ConfigError(f"{source}: each 'devices' entry needs name and owned_from: YYYY-MM-DD")
+        out[str(item["name"])] = owned
+    return out
 
 
 def load_config(path: str | Path | None = None) -> Config:
@@ -141,4 +154,6 @@ def load_config(path: str | Path | None = None) -> Config:
         kwargs["load_bands"] = tuple(float(v) for v in thresholds["load_bands"])
     if "garmin_join_tolerance_s" in thresholds:
         kwargs["garmin_join_tolerance_s"] = int(thresholds["garmin_join_tolerance_s"])
+    if raw.get("devices"):
+        kwargs["device_owned_from"] = _devices(raw["devices"], source)
     return Config(**kwargs)

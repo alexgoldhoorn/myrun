@@ -78,3 +78,13 @@ def test_empty_database(tmp_path):
     df = activities(cfg=cfg)
     assert df.empty
     assert {"activity_id", "date", "distance_km", "surface", "session_type"} <= set(df.columns)
+
+
+def test_a_second_hand_watch_drops_the_previous_owners_activities(cfg):
+    from dataclasses import replace
+
+    from tests.fixture import OLD, start_of
+    owned = (start_of(OLD, TODAY) + pd.Timedelta(days=1)).date()
+    ids = set(activities(cfg=replace(cfg, device_owned_from={"Garmin Forerunner 945": owned}))
+              ["activity_id"].astype(str))
+    assert str(OLD) not in ids and str(STEADY) in ids
