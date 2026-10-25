@@ -113,3 +113,10 @@ def test_hr_sensors_are_read_and_sorted(tmp_path):
 def test_hr_sensor_without_a_date_is_rejected(tmp_path):
     with pytest.raises(ConfigError):
         load_config(_write(tmp_path, "strava_db: /d.db\nhr: {sensors: [{name: strap}]}\n"))
+
+
+def test_hr_sensors_worn(tmp_path):
+    cfg = load_config(_write(tmp_path, "strava_db: /d.db\nhr: {sensors_worn: hard}\n"))
+    assert cfg.hr_sensors_worn == "hard"
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, "strava_db: /d.db\nhr: {sensors_worn: sometimes}\n"))

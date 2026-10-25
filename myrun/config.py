@@ -33,6 +33,7 @@ class Config:
     hr_zone_upper_bounds: tuple[int, ...] | None = None  # None: calculated from max_hr
     easy_hr_band: tuple[int, int] | None = None          # None: calculated from max_hr
     hr_sensors: tuple[tuple[date, str], ...] = ()        # (in use from, name), oldest first
+    hr_sensors_worn: str = "all"                        # "hard": only on hard runs, the rest is wrist HR
     mixed_hilliness_m_per_km: float | None = None        # None: surface is the sport type only
     efficiency_max_hilliness_m_per_km: float = 20.0
     grade_class_m_per_km: float = 20.0
@@ -46,7 +47,7 @@ _TOP = {"strava_db", "cache_dir", "inputs", "race_log_columns", "race_log_date_f
 _INPUTS = {"wellness_parquet", "plan_csv", "race_log_csv", "garmin_activities"}
 _OLD_INPUTS = {"garmin_activities_parquet": "garmin_activities"}   # still accepted
 _LINKS = {"statistics_for_strava_url"}
-_HR = {"max_hr", "zone_upper_bounds", "easy_band", "sensors"}
+_HR = {"max_hr", "zone_upper_bounds", "easy_band", "sensors", "sensors_worn"}
 _THRESHOLDS = {"mixed_hilliness_m_per_km", "efficiency_max_hilliness_m_per_km",
                "grade_class_m_per_km", "load_bands", "stale_hours", "garmin_join_tolerance_s"}
 
@@ -129,6 +130,10 @@ def load_config(path: str | Path | None = None) -> Config:
         kwargs["easy_hr_band"] = (int(low), int(high))
     if hr.get("sensors"):
         kwargs["hr_sensors"] = _sensors(hr["sensors"], source)
+    if hr.get("sensors_worn"):
+        if hr["sensors_worn"] not in ("all", "hard"):
+            raise ConfigError(f"{source}: 'hr.sensors_worn' must be 'all' or 'hard'")
+        kwargs["hr_sensors_worn"] = hr["sensors_worn"]
     for key in _THRESHOLDS - {"load_bands", "garmin_join_tolerance_s"}:
         if thresholds.get(key) is not None:
             kwargs[key] = float(thresholds[key])

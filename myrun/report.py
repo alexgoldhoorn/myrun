@@ -183,6 +183,9 @@ def fitness_by_band(months: int = DEFAULT_MONTHS, *, first_year: int | None = No
             line += "; HR " + ", ".join(f"{name} {_num(pct, 0)} %"
                                         for name, pct in row.sensors.items())
         out.append(line)
+    if cfg.hr_sensors and cfg.hr_sensors_worn == "hard":
+        out.append("- the strap is worn on hard runs only, so most runs here are wrist HR from "
+                   "the watch: a change of watch is a change of HR sensor")
 
     yearly = bands.since_year(bands.band_table(runs, "year", season), first_year)
     for surface in bands.SURFACES:

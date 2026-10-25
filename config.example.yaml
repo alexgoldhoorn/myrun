@@ -50,6 +50,7 @@ hr:                                   # all optional. With nothing set, the maxi
   # easy_band: [125, 148]             # average HR that counts as an easy run
   # sensors:                          # HR straps, so a change shows in the by-band report
   #   - {since: 2021-01-01, name: strap 1}
+  # sensors_worn: hard                # all (default) or hard: the strap only on hard runs
 
 thresholds:
   # mixed_hilliness_m_per_km: 15    # label a Run that climbs this much per km as "mixed"
