@@ -171,7 +171,11 @@ def test_report_by_band_names_the_hr_sensor_when_configured(cfg):
     from datetime import date
     text = report.fitness_by_band(12, cfg=replace(cfg, hr_sensors=((date(2000, 1, 1), "strap 1"),)),
                                   today=TODAY, first_year=2020)
-    assert "; HR strap 1 100 %" in text
+    assert "; HR strap 1 100 %" in text and "wrist HR" not in text
+    text = report.fitness_by_band(12, cfg=replace(cfg, hr_sensors=((date(2000, 1, 1), "strap 1"),),
+                                                  hr_sensors_worn="hard"),
+                                  today=TODAY, first_year=2020)
+    assert "worn on hard runs only" in text
 
 
 def test_report_cli_by_band_and_bad_season(cfg, monkeypatch, capsys):
