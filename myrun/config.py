@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
 import yaml
@@ -31,6 +32,7 @@ class Config:
     max_hr: int | None = None                           # None: observed from recent runs
     hr_zone_upper_bounds: tuple[int, ...] | None = None  # None: calculated from max_hr
     easy_hr_band: tuple[int, int] | None = None          # None: calculated from max_hr
+    hr_sensors: tuple[tuple[date, str], ...] = ()        # (in use from, name), oldest first
     mixed_hilliness_m_per_km: float | None = None        # None: surface is the sport type only
     efficiency_max_hilliness_m_per_km: float = 20.0
     grade_class_m_per_km: float = 20.0
@@ -44,7 +46,7 @@ _TOP = {"strava_db", "cache_dir", "inputs", "race_log_columns", "race_log_date_f
 _INPUTS = {"wellness_parquet", "plan_csv", "race_log_csv", "garmin_activities"}
 _OLD_INPUTS = {"garmin_activities_parquet": "garmin_activities"}   # still accepted
 _LINKS = {"statistics_for_strava_url"}
-_HR = {"max_hr", "zone_upper_bounds", "easy_band"}
+_HR = {"max_hr", "zone_upper_bounds", "easy_band", "sensors"}
 _THRESHOLDS = {"mixed_hilliness_m_per_km", "efficiency_max_hilliness_m_per_km",
                "grade_class_m_per_km", "load_bands", "stale_hours", "garmin_join_tolerance_s"}
 
@@ -65,6 +67,16 @@ def _section(raw: dict, name: str, allowed: set[str], source: Path) -> dict:
     if unknown:
         raise ConfigError(f"{source}: unknown key(s) in '{name}': {', '.join(unknown)}")
     return section
+
+
+def _sensors(items, source: Path) -> tuple[tuple[date, str], ...]:
+    out = []
+    for item in items if isinstance(items, list) else [items]:
+        since = item.get("since") if isinstance(item, dict) else None
+        if not isinstance(since, date) or not item.get("name"):
+            raise ConfigError(f"{source}: each 'hr.sensors' entry needs since: YYYY-MM-DD and name")
+        out.append((since, str(item["name"])))
+    return tuple(sorted(out))
 
 
 def load_config(path: str | Path | None = None) -> Config:
@@ -115,6 +127,8 @@ def load_config(path: str | Path | None = None) -> Config:
     if hr.get("easy_band"):
         low, high = hr["easy_band"]
         kwargs["easy_hr_band"] = (int(low), int(high))
+    if hr.get("sensors"):
+        kwargs["hr_sensors"] = _sensors(hr["sensors"], source)
     for key in _THRESHOLDS - {"load_bands", "garmin_join_tolerance_s"}:
         if thresholds.get(key) is not None:
             kwargs[key] = float(thresholds[key])

@@ -37,7 +37,7 @@ CREATE TABLE Activity (activityId VARCHAR(255) PRIMARY KEY, startDateTime DATETI
   weather CLOB, sportType VARCHAR(255), name VARCHAR(255), distance INTEGER, elevation INTEGER,
   averageSpeed DOUBLE, averageHeartRate INTEGER, maxHeartRate INTEGER, averageCadence INTEGER,
   movingTimeInSeconds INTEGER, markedForDeletion BOOLEAN, workoutType VARCHAR(255),
-  streamsAreImported BOOLEAN);
+  streamsAreImported BOOLEAN, deviceName VARCHAR(255));
 CREATE TABLE ActivityStream (activityId VARCHAR(255), streamType VARCHAR(255), createdOn DATETIME,
   dataSize INTEGER, data BLOB);
 CREATE TABLE ActivitySplit (activityId VARCHAR(255), unitSystem VARCHAR(255), splitNumber INTEGER,
@@ -69,14 +69,15 @@ def _weather(temp: float) -> str:
 
 
 def _activity(conn, aid, today, sport, dist, elev, moving, hr, effort, *, weather=None,
-              workout=None, deleted=0, streams=0):
+              workout=None, deleted=0, streams=0,
+              device="Garmin Forerunner 965"):
     data = {} if effort is None else {"suffer_score": effort}
     speed = dist / moving * 3.6 if moving and dist else 0
     conn.execute(
-        "INSERT INTO Activity VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO Activity VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (aid, start_of(aid, today).strftime("%Y-%m-%d %H:%M:%S"), json.dumps(data), weather,
          sport, "Morning Run", dist, elev, speed, hr, None if hr is None else hr + 6, 85,
-         moving, deleted, workout, streams),
+         moving, deleted, workout, streams, device),
     )
 
 
@@ -104,7 +105,8 @@ def build_fixture(path: Path, today: date = TODAY, empty: bool = False) -> Path:
     _activity(conn, GYM, today, "WeightTraining", 0, 0, 1800, 100, 15, weather="")
     _activity(conn, NOEFFORT, today, "Run", 5000, 10, 1500, None, None, weather="[]", streams=1)
     _activity(conn, DELETED, today, "Run", 8000, 20, 2400, 140, 500, deleted=1)
-    _activity(conn, OLD, today, "Run", 10000, 40, 3000, 140, 50, weather=_weather(15.0))
+    _activity(conn, OLD, today, "Run", 10000, 40, 3000, 140, 50, weather=_weather(15.0),
+              device="Garmin Forerunner 945")
 
     # STEADY: 40 minutes at 3.0 m/s, HR 140 in the first half and 147 in the second.
     n = 2400

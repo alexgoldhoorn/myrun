@@ -100,3 +100,16 @@ def test_both_garmin_keys_at_once_is_an_error(tmp_path):
                     "  garmin_activities_parquet: /d/g.parquet\n")
     with pytest.raises(ConfigError, match="garmin_activities"):
         load_config(path)
+
+
+def test_hr_sensors_are_read_and_sorted(tmp_path):
+    from datetime import date
+    cfg = load_config(_write(tmp_path, "strava_db: /d.db\nhr:\n  sensors:\n"
+                             "    - {since: 2023-04-11, name: strap 2}\n"
+                             "    - {since: 2020-12-30, name: strap 1}\n"))
+    assert cfg.hr_sensors == ((date(2020, 12, 30), "strap 1"), (date(2023, 4, 11), "strap 2"))
+
+
+def test_hr_sensor_without_a_date_is_rejected(tmp_path):
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, "strava_db: /d.db\nhr: {sensors: [{name: strap}]}\n"))
