@@ -340,3 +340,14 @@ def test_dashboard_puts_the_row_hint_above_the_recent_runs(baseline):
     at = run_page("views/dashboard.py")
     captions = [c.value for c in at.caption]
     assert "Select a row to open it on the Activity page." in captions
+
+
+def test_activity_laps_numbered_from_zero_display_from_one(baseline, monkeypatch):
+    import pandas as pd
+    from myrun import streams
+    monkeypatch.setattr(streams, "activity_laps", lambda activity_id, cfg=None: pd.DataFrame({
+        "lap": [0, 1], "name": ["a", "b"], "distance_km": [1.0, 1.0], "duration_s": [300, 310],
+        "pace_min_km": [5.0, 5.2], "avg_hr": [140, 145], "elev_diff_m": [1.0, 2.0]}))
+    at = run_page("views/activity.py")
+    laps = next(d.value for d in at.dataframe if "lap" in d.value.columns)
+    assert laps["lap"].tolist() == [1, 2]

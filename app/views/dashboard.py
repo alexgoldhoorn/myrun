@@ -90,7 +90,8 @@ if plan is not None:
     table.insert(1, "Planned", [
         "rest" if str(kind).split("; ")[0] == "rest" else (text if isinstance(text, str) else "—")
         for text, kind in zip(week["planned"], week["planned_type"])])
-st.dataframe(table, hide_index=True)
+st.dataframe(table, hide_index=True,
+             column_config={c: st.column_config.Column(c) for c in table.columns})
 run_km = week["actual_run_km"].sum()
 if plan is not None and week["planned_km"].notna().any():
     st.caption(f"Running: {run_km:.1f} km done of {week['planned_km'].sum():.1f} km planned.")

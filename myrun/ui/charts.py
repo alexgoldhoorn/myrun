@@ -60,7 +60,7 @@ def stream_figure(streams_df: pd.DataFrame, x: str = "time",
             vals, text = fmt.pace_ticks(shown)
             if vals:
                 fig.update_yaxes(tickmode="array", tickvals=vals, ticktext=text, row=row, col=1)
-    fig.update_xaxes(title_text=fmt.label("distance_km") if x == "distance" else "Time (min)",
+    fig.update_xaxes(title_text=fmt.label("distance_km") if x == "distance" else fmt.label("time_min"),
                      row=len(metrics), col=1)
     theme.style(fig, height=200 * len(metrics) + 60)
     fig.update_layout(hovermode="x unified")
@@ -73,7 +73,7 @@ def zone_bar(zones: pd.DataFrame) -> go.Figure:
                            text=[f"{p:.0f}%" for p in zones["pct"]],
                            hovertemplate="%{y}: %{x:.0f} min<extra></extra>"))
     theme.style(fig, height=220)
-    fig.update_layout(xaxis_title="Minutes")
+    fig.update_layout(xaxis_title=fmt.label("minutes"))
     return fig
 
 
@@ -133,7 +133,7 @@ def weekly_km_bars(weekly: pd.DataFrame) -> go.Figure:
                                                          "line": {"width": 2}},
                                  hovertemplate="planned %{y:.1f} km<extra></extra>"))
     theme.style(fig, height=260)
-    fig.update_layout(yaxis_title="Running km", xaxis_title=None)
+    fig.update_layout(yaxis_title=fmt.label("run_km"), xaxis_title=None)
     return fig
 
 
@@ -145,7 +145,7 @@ def intensity_bars(weekly: pd.DataFrame) -> go.Figure:
                              hovertemplate="week of %{x|%d %b}<br>%{y:.0f} min " + kind
                                            + "<extra></extra>"))
     theme.style(fig, height=300)
-    fig.update_layout(barmode="stack", yaxis_title="Running minutes", xaxis_title=None)
+    fig.update_layout(barmode="stack", yaxis_title=fmt.label("run_minutes"), xaxis_title=None)
     return fig
 
 
@@ -158,7 +158,7 @@ def easy_pace_line(weekly: pd.DataFrame) -> go.Figure:
                                hovertemplate="week of %{x|%d %b}<br>%{text} /km<extra></extra>"))
     theme.style(fig, height=260)
     vals, text = fmt.pace_ticks(shown["easy_pace_min_km"])
-    fig.update_layout(yaxis_title="Easy " + fmt.label("pace_min_km").lower(), xaxis_title=None)
+    fig.update_layout(yaxis_title=fmt.label("easy_pace"), xaxis_title=None)
     fig.update_yaxes(autorange="reversed",
                      **(dict(tickmode="array", tickvals=vals, ticktext=text) if vals else {}))
     return fig
@@ -172,7 +172,7 @@ def efficiency_year_bars(yearly: pd.DataFrame) -> go.Figure:
                                          "%{customdata[1]} months<extra></extra>"))
     theme.style(fig, height=280)
     low = float(yearly["efficiency"].min()) if len(yearly) else 0.0
-    fig.update_layout(yaxis_title="m per heartbeat", xaxis_title=None)
+    fig.update_layout(yaxis_title=fmt.label("m_per_beat"), xaxis_title=None)
     fig.update_yaxes(range=[low * 0.9, None])
     return fig
 
@@ -189,7 +189,8 @@ def band_hr_lines(table: pd.DataFrame, bands_order) -> go.Figure:
             hovertemplate=f"{year} · %{{x}}/km<br>HR %{{y:.0f}} (%{{customdata[1]:.0f}} % max)"
                           "<br>%{customdata[0]} runs, %{customdata[2]:.0f} °C<extra></extra>"))
     theme.style(fig, height=320)
-    fig.update_layout(yaxis_title="Mean HR (bpm)", xaxis_title="Grade-adjusted pace (min/km)")
+    fig.update_layout(yaxis_title=fmt.label("mean_hr"),
+                      xaxis_title=fmt.label("gap_min_km"))
     fig.update_xaxes(categoryorder="array", categoryarray=list(bands_order))
     return fig
 
@@ -202,5 +203,5 @@ def intensity_share_bars(yearly: pd.DataFrame) -> go.Figure:
                              name=kind,
                              hovertemplate="%{x}<br>%{y:.0f} % " + kind + "<extra></extra>"))
     theme.style(fig, height=280)
-    fig.update_layout(barmode="stack", yaxis_title="% of running minutes", xaxis_title=None)
+    fig.update_layout(barmode="stack", yaxis_title=fmt.label("share_minutes"), xaxis_title=None)
     return fig

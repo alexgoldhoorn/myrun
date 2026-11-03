@@ -42,6 +42,9 @@ LABELS = {
     "official_time_s": "Official time (s)", "duration_s": "Duration (s)", "split": "Split (km)",
     "altitude_m": "Elevation (m)", "hr": "Heart rate (bpm)", "session_type": "Session type",
     "garmin_url": "Garmin", "strava_url": "Strava", "diploma_url": "Diploma",
+    "easy_pace": "Easy pace (min/km)", "minutes": "Minutes", "run_km": "Running km",
+    "run_minutes": "Running minutes", "m_per_beat": "m per heartbeat",
+    "mean_hr": "Mean HR (bpm)", "share_minutes": "% of running minutes", "time_min": "Time (min)",
     "surface": "Surface", "grade_class": "Climb or descent",
 }
 
