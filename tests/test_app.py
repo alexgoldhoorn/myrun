@@ -213,12 +213,12 @@ def test_explore_page_per_km_level(baseline):
 
 def test_explore_page_offers_dynamics_only_with_the_garmin_input(baseline):
     y = next(s for s in run_page("views/explore.py").selectbox if s.label == "Y")
-    assert "ground_contact_ms" not in y.options
+    assert "Ground contact (ms)" not in y.options
 
 
 def test_explore_page_offers_dynamics_with_the_garmin_input(everything):
     y = next(s for s in run_page("views/explore.py").selectbox if s.label == "Y")
-    assert "ground_contact_ms" in y.options
+    assert "Ground contact (ms)" in y.options
 
 
 def test_pages_say_where_the_hr_zones_come_from(baseline):
@@ -317,3 +317,26 @@ def test_entrypoint_routes_to_the_dashboard(baseline):
     at = run_page("Dashboard.py")
     assert not at.exception
     assert "Dashboard" in [t.value for t in at.title]
+
+
+def test_activity_picker_names_the_session_and_the_date(baseline):
+    options = run_page("views/activity.py").selectbox[0].options
+    assert options and all(" · " in o and o.endswith(" km") for o in options)
+    assert not any(o[:4].isdigit() for o in options)            # no ISO timestamp first
+
+
+def test_activity_laps_count_from_one(baseline):
+    at = run_page("views/activity.py")
+    laps = next(d.value for d in at.dataframe if "lap" in d.value.columns)
+    assert laps["lap"].min() == 1
+
+
+def test_footer_uses_human_input_names(baseline):
+    text = _text(run_page("views/dashboard.py"))
+    assert "Strava DB: ok" in text and "strava_db" not in text
+
+
+def test_dashboard_puts_the_row_hint_above_the_recent_runs(baseline):
+    at = run_page("views/dashboard.py")
+    captions = [c.value for c in at.caption]
+    assert "Select a row to open it on the Activity page." in captions

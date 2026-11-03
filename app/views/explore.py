@@ -2,7 +2,7 @@
 
 import streamlit as st
 
-from myrun import explore
+from myrun import explore, fmt
 from myrun.config import RUN_SPORTS
 from myrun.ui import charts, common
 
@@ -53,9 +53,10 @@ if len(numeric) < 2:
 categories = [g for g in groups if g != "(none)"]
 left, middle, right = st.columns(3)
 x_choice = left.selectbox("X", numeric + [f"category: {g}" for g in categories],
+                          format_func=lambda c: c if c.startswith("category: ") else fmt.label(c),
                           index=numeric.index("temp_c") if "temp_c" in numeric else 0)
 y_default = "pace_min_km" if "pace_min_km" in numeric else numeric[-1]
-y_choice = middle.selectbox("Y", numeric, index=numeric.index(y_default))
+y_choice = middle.selectbox("Y", numeric, format_func=fmt.label, index=numeric.index(y_default))
 group_choice = right.selectbox("Group by", groups)
 
 with st.expander("Block sizes"):
@@ -77,7 +78,8 @@ def _chart():
         x_column = x_choice
     group = explore.group_series(plot, group_choice, **blocks)
     figure = charts.explore_figure(plot, x_column, y_choice, group)
-    figure.update_layout(xaxis_title=x_choice.removeprefix("category: "))
+    figure.update_layout(xaxis_title=fmt.label(x_choice.removeprefix("category: ")),
+                         legend_title_text=None if group_choice == "(none)" else group_choice)
     if x_column == "_x":
         figure.update_xaxes(categoryorder="array", categoryarray=explore.ordered(plot["_x"]))
     return figure, len(plot[[x_column, y_choice]].dropna()), len(plot)

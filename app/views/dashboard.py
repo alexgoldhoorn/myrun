@@ -5,7 +5,7 @@ import datetime as dt
 import pandas as pd
 import streamlit as st
 
-from myrun import links
+from myrun import fmt, links
 from myrun.ui import cards, charts, common
 
 cfg = common.setup("Dashboard")
@@ -75,9 +75,21 @@ with middle:
 # ---- this week ------------------------------------------------------------
 st.subheader("This week")
 week = common.cached("plan_vs_actual", cfg)
-table = pd.DataFrame({"Day": week["date"].dt.strftime("%a %d %b"), "Done": week["actual"]})
+
+
+def _done_text(day, text):
+    that_day = acts[acts["date"] == day]
+    if len(that_day) > 1:
+        return fmt.day_summary(that_day["sport"], that_day["distance_km"])
+    return text
+
+
+done = [_done_text(day, text) for day, text in zip(week["date"], week["actual"])]
+table = pd.DataFrame({"Day": week["date"].dt.strftime("%a %d %b"), "Done": done})
 if plan is not None:
-    table.insert(1, "Planned", week["planned"])
+    table.insert(1, "Planned", [
+        "rest" if str(kind).split("; ")[0] == "rest" else (text if isinstance(text, str) else "—")
+        for text, kind in zip(week["planned"], week["planned_type"])])
 st.dataframe(table, hide_index=True)
 run_km = week["actual_run_km"].sum()
 if plan is not None and week["planned_km"].notna().any():
@@ -107,12 +119,15 @@ else:
     listing = listing.drop(columns=[c for c in ("Session", "Garmin", "Stats")
                                     if listing[c].isna().all()])
     link = st.column_config.LinkColumn(display_text="open")
-    picked = st.dataframe(listing, hide_index=True, on_select="rerun", selection_mode="single-row",
+    st.caption("Select a row to open it on the Activity page.")
+    order = [c for c in ("When", "Session", "km", "min", "Strava", "Avg HR", "Effort", "Sport",
+                         "Garmin", "Stats") if c in listing]
+    picked = st.dataframe(listing[order], hide_index=True, on_select="rerun",
+                          selection_mode="single-row",
                           column_config={"Strava": link, "Garmin": link, "Stats": link},
                           key="recent")
     if picked.selection.rows:
         st.session_state["activity_id"] = recent["activity_id"].iloc[picked.selection.rows[0]]
         st.switch_page("views/activity.py")
-    st.caption("Select a row to open it on the Activity page.")
 
 common.footer(acts, states)

@@ -20,6 +20,15 @@ if acts.empty:
     st.stop()
 runs = acts[acts["sport"].isin(RUN_SPORTS)]
 
+
+def _titled(figure, x, y, legend=None):
+    """Human axis titles (and legend title) on a Plotly Express figure."""
+    figure.update_layout(xaxis_title=fmt.label(x), yaxis_title=fmt.label(y))
+    if legend:
+        figure.update_layout(legend_title_text=fmt.label(legend))
+    return figure
+
+
 tabs = st.tabs(["Fitness", "Volume", "Efforts", "Dynamics", "Gear", "Races", "Wellness"])
 
 
@@ -116,15 +125,16 @@ with tabs[1]:
     by = left.radio("Per", ["week", "month", "year"], index=1, horizontal=True)
     measure = right.radio("Measure", ["distance_km", "duration_h", "elevation_m"], horizontal=True)
     st.plotly_chart(common.figure(
-        "volume", cfg, lambda: theme.style(px.bar(common.cached("volume", cfg, by), x="period",
-                                                  y=measure, color="sport"), height=360),
+        "volume", cfg, lambda: _titled(theme.style(
+            px.bar(common.cached("volume", cfg, by), x="period", y=measure, color="sport"),
+            height=360), "period", measure, "sport"),
         by, measure))
     if len(runs):
         st.caption("Running distance, cumulative through each year.")
         st.plotly_chart(common.figure(
-            "year_over_year", cfg, lambda: theme.style(px.line(
+            "year_over_year", cfg, lambda: _titled(theme.style(px.line(
                 trends.year_over_year(runs), x="day_of_year", y="cumulative_km", color="year"),
-                height=360)))
+                height=360), "day_of_year", "cumulative_km", "year")))
 
 
 with tabs[2]:
@@ -143,9 +153,9 @@ with tabs[2]:
             figure = px.scatter(chosen, x="date", y="time_s", color="kind",
                                 hover_data={"time_s": False, "time": True, "pace": True})
             vals, text = fmt.duration_ticks(chosen["time_s"])
-            figure.update_yaxes(autorange="reversed", title="Time",
+            figure.update_yaxes(autorange="reversed",
                                 **(dict(tickmode="array", tickvals=vals, ticktext=text) if vals else {}))
-            return theme.style(figure, height=360)
+            return _titled(theme.style(figure, height=360), "date", "time", "kind")
 
         st.plotly_chart(common.figure("best_efforts", cfg, _efforts_figure, int(distance)))
 
@@ -177,11 +187,15 @@ with tabs[4]:
         st.subheader("Shoes")
         table = pd.DataFrame({
             "Shoe": shoes["name"], "km": shoes["km"].round(0), "Runs": shoes["runs"],
-            "Last used": shoes["last_used"].dt.strftime("%d %b %Y"),
+            "Last used": shoes["last_used"],
             "Status": [trends.shoe_status(km, retired)
                        for km, retired in zip(shoes["km"], shoes["retired"])],
         })
-        st.dataframe(table, hide_index=True)
+        st.dataframe(table, hide_index=True, column_config={
+            "Shoe": st.column_config.Column("Shoe"), "km": st.column_config.NumberColumn("km"),
+            "Runs": st.column_config.NumberColumn("Runs"),
+            "Last used": st.column_config.DateColumn("Last used", format="DD MMM YYYY"),
+            "Status": st.column_config.Column("Status")})
         st.caption(f"Running distance per shoe from Strava gear. Worth a check from "
                    f"{trends.SHOE_CHECK_KM:g} km; past {trends.SHOE_LIMIT_KM:g} km a pair is due "
                    "for walking only.")
@@ -205,15 +219,16 @@ with tabs[5]:
                 def _rank_figure():
                     figure = px.scatter(races, x="date", y="rank_pct", hover_name="name",
                                         color="type" if "type" in races else None)
-                    figure.update_yaxes(autorange="reversed",
-                                        title="Rank percentile (lower is better)")
-                    return theme.style(figure, height=360)
+                    figure.update_yaxes(autorange="reversed")
+                    return _titled(theme.style(figure, height=360), "date", "rank_pct", "type")
 
                 st.plotly_chart(common.figure("race_rank", cfg, _rank_figure, tuple(kinds)))
-            links_config = {c: st.column_config.LinkColumn(display_text="open")
-                            for c in ("garmin_url", "strava_url") if c in races}
-            st.dataframe(races.sort_values("date", ascending=False), hide_index=True,
-                         column_config=links_config)
+            shown = races.sort_values("date", ascending=False)
+            config = {c: st.column_config.Column(fmt.label(c)) for c in shown.columns}
+            config.update({c: st.column_config.LinkColumn(fmt.label(c), display_text="open")
+                           for c in ("garmin_url", "strava_url", "diploma_url") if c in shown})
+            config["date"] = st.column_config.DateColumn(fmt.label("date"), format="DD MMM YYYY")
+            st.dataframe(shown, hide_index=True, column_config=config)
 
     if race_state.status == "off":
         st.caption("Needs the race log file.")
@@ -229,7 +244,8 @@ with tabs[6]:
             def _wellness_figure(column):
                 monthly = (wellness.assign(month=wellness["date"].dt.to_period("M").dt.start_time)
                            .groupby("month", as_index=False)[column].mean())
-                return theme.style(px.line(monthly, x="month", y=column, markers=True), height=320)
+                return _titled(theme.style(px.line(monthly, x="month", y=column, markers=True),
+                                           height=320), "month", column)
 
             for column in present:
                 st.plotly_chart(common.figure("wellness", cfg, lambda: _wellness_figure(column), column),

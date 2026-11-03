@@ -64,7 +64,7 @@ def test_shoes_table_and_a_database_without_gear(cfg):
     conn.executescript("""
         CREATE TABLE Gear (gearId VARCHAR(255), name VARCHAR(255), isRetired BOOLEAN);
         ALTER TABLE Activity ADD COLUMN gearId VARCHAR(255);
-        INSERT INTO Gear VALUES ('g1', 'Road <shoe>', 0), ('g2', 'Old pair', 1), ('g3', 'Bike', 0);
+        INSERT INTO Gear VALUES ('g1', 'Road <shoe>', 0), ('g2', 'Old pair Old pair', 1), ('g3', 'Bike', 0);
     """)
     conn.execute("UPDATE Activity SET gearId = 'g1' WHERE activityId IN (?, ?)", (STEADY, OLD))
     conn.execute("UPDATE Activity SET gearId = 'g2' WHERE activityId = ?", (RACE,))

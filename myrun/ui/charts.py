@@ -15,12 +15,11 @@ def load_bars(weekly: pd.DataFrame) -> go.Figure:
     fig = go.Figure(go.Bar(x=weekly["week_start"], y=weekly["effort"],
                            hovertemplate="week of %{x|%d %b}<br>effort %{y:.0f}<extra></extra>"))
     theme.style(fig, height=260)
-    fig.update_layout(yaxis_title="Relative effort", xaxis_title=None)
+    fig.update_layout(yaxis_title=fmt.label("relative_effort"), xaxis_title=None)
     return fig
 
 
-_STREAM_METRICS = [("hr", "Heart rate (bpm)"), ("pace_min_km", "Pace (min/km)"),
-                   ("altitude_m", "Elevation (m)"), ("cadence_spm", "Cadence (spm)")]
+_STREAM_METRICS = [(c, fmt.label(c)) for c in ("hr", "pace_min_km", "altitude_m", "cadence_spm")]
 PACE_SMOOTHING_SAMPLES = 15
 
 
@@ -61,7 +60,7 @@ def stream_figure(streams_df: pd.DataFrame, x: str = "time",
             vals, text = fmt.pace_ticks(shown)
             if vals:
                 fig.update_yaxes(tickmode="array", tickvals=vals, ticktext=text, row=row, col=1)
-    fig.update_xaxes(title_text="Distance (km)" if x == "distance" else "Time (min)",
+    fig.update_xaxes(title_text=fmt.label("distance_km") if x == "distance" else "Time (min)",
                      row=len(metrics), col=1)
     theme.style(fig, height=200 * len(metrics) + 60)
     fig.update_layout(hovermode="x unified")
@@ -106,7 +105,8 @@ def explore_figure(df: pd.DataFrame, x: str, y: str, group: pd.Series | None = N
                                          mode="lines", legendgroup=name, showlegend=False,
                                          hoverinfo="skip"))
     theme.style(fig, height=520)
-    fig.update_layout(xaxis_title=x, yaxis_title=y, showlegend=group is not None)
+    fig.update_layout(xaxis_title=fmt.label(x), yaxis_title=fmt.label(y),
+                      showlegend=group is not None)
     for column, update in ((x, fig.update_xaxes), (y, fig.update_yaxes)):
         if column in fmt.PACE_COLUMNS:
             vals, text = fmt.pace_ticks(df[column])
@@ -158,7 +158,7 @@ def easy_pace_line(weekly: pd.DataFrame) -> go.Figure:
                                hovertemplate="week of %{x|%d %b}<br>%{text} /km<extra></extra>"))
     theme.style(fig, height=260)
     vals, text = fmt.pace_ticks(shown["easy_pace_min_km"])
-    fig.update_layout(yaxis_title="Easy pace (min/km)", xaxis_title=None)
+    fig.update_layout(yaxis_title="Easy " + fmt.label("pace_min_km").lower(), xaxis_title=None)
     fig.update_yaxes(autorange="reversed",
                      **(dict(tickmode="array", tickvals=vals, ticktext=text) if vals else {}))
     return fig

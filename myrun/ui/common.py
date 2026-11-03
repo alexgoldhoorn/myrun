@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from myrun import bands, dynamics, links, metrics, optional, streams, trends
+from myrun import bands, dynamics, fmt, links, metrics, optional, streams, trends
 from myrun.activities import activities
 from myrun.config import RUN_SPORTS, Config, ConfigError, load_config
 from myrun.hr import hr_settings
@@ -208,6 +208,6 @@ def footer(acts: pd.DataFrame, states: dict[str, InputState]) -> None:
         if state.status == "off":
             continue
         age = f", {state.age_hours:.0f} h old" if state.age_hours is not None else ""
-        parts.append(f"{state.name}: {state.status}{age}")
+        parts.append(f"{fmt.label(state.name)}: {state.status}{age}")
     st.divider()
     st.caption(" · ".join(parts))

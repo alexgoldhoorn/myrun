@@ -60,3 +60,33 @@ def test_share_is_a_whole_percentage_and_changes_in_points():
 
 def test_weeks_unit():
     assert fmt.metric_value(3.0, "weeks") == "3 wk"
+
+
+def test_km_values_use_a_thousands_separator():
+    assert fmt.metric_value(1234.56, "km") == "1,234.6 km"
+    assert fmt.metric_delta(1234.56, "km") == "+1,234.6 km"
+
+
+def test_label_maps_keys_and_falls_back_to_plain_words():
+    assert fmt.label("temp_c") == "Temperature (\u00b0C)"
+    assert fmt.label("strava_db") == "Strava DB"
+    assert fmt.label("some_new_column") == "some new column"
+    assert fmt.label("ground_contact_ms") == "Ground contact (ms)"
+
+
+@pytest.mark.parametrize("raw, clean", [
+    ("Mizuno Wave Rider 28 Wave Rider 28", "Mizuno Wave Rider 28"),
+    ("Raidlight Responsiv ultra 2.0 Responsiv 2.0 [trail]", "Raidlight Responsiv ultra 2.0 [trail]"),
+    ("ASICS Gel-Cumulus 27 Cumulus 27", "ASICS Gel-Cumulus 27"),
+    ("Nike Pegasus Trail 39 Pegasus Trail 39", "Nike Pegasus Trail 39"),
+    ("New Balance M880 v15 NB M880", "New Balance M880 v15 NB M880"),
+    ("Saucony Ride 15", "Saucony Ride 15"),
+    ("Decathlon NewFeel Decathlon (Indoor gym)", "Decathlon NewFeel Decathlon (Indoor gym)"),
+])
+def test_shoe_name_drops_a_repeated_alias(raw, clean):
+    assert fmt.shoe_name(raw) == clean
+
+
+def test_day_summary_counts_sports_and_adds_the_distance():
+    assert fmt.day_summary(["Walk", "Walk", "Walk"], [1.5, 1.6, 1.8]) == "3 walks \u00b7 4.9 km"
+    assert fmt.day_summary(["Run", "Walk", "Walk"], [10.0, 1.8, 1.8]) == "1 run, 2 walks \u00b7 13.6 km"

@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 
 from myrun import fmt, links, streams
+from myrun.config import RUN_SPORTS
 from myrun.ui import cards, charts, common
 
 cfg = common.setup("Activity")
@@ -23,12 +24,20 @@ if candidates.empty:
     common.footer(acts, states)
     st.stop()
 
-labels = {r.activity_id: f"{r.start:%Y-%m-%d %H:%M} · {r.sport} · {r.distance_km:.1f} km"
-          for r in candidates.itertuples()}
+def _option(r) -> str:
+    session = getattr(r, "session_name", None)
+    title = session if isinstance(session, str) and session else r.sport
+    return f"{title} · {r.start:%a %d %b %Y %H:%M} · {r.distance_km:.1f} km"
+
+
+labels = {r.activity_id: _option(r) for r in candidates.itertuples()}
 by_label = {label: activity_id for activity_id, label in labels.items()}
 options = list(by_label)
 wanted = labels.get(st.session_state.get("activity_id"))
-choice = st.selectbox("Activity", options, index=options.index(wanted) if wanted in options else 0)
+newest_run = candidates[candidates["sport"].isin(RUN_SPORTS)]
+default = labels[(newest_run if len(newest_run) else candidates).iloc[0]["activity_id"]]
+choice = st.selectbox("Activity", options,
+                      index=options.index(wanted if wanted in options else default))
 activity_id = by_label[choice]
 row = candidates.set_index("activity_id").loc[activity_id]
 
@@ -104,9 +113,13 @@ if laps.empty:
     st.caption("No laps recorded.")
 else:
     shown = laps.round({"distance_km": 2})
+    if shown["lap"].min() == 0:                  # display only: laps count from 1
+        shown["lap"] = shown["lap"] + 1
     shown["pace"] = shown.pop("pace_min_km").map(fmt.pace)
     shown["time"] = shown.pop("duration_s").map(fmt.duration)
-    st.dataframe(shown[["lap", "name", "distance_km", "time", "pace", "avg_hr", "elev_diff_m"]],
-                 hide_index=True)
+    columns = ["lap", "name", "distance_km", "time", "pace", "avg_hr", "elev_diff_m"]
+    names = {"avg_hr": "Avg HR"}
+    st.dataframe(shown[columns], hide_index=True, column_config={
+        c: st.column_config.Column(names.get(c, fmt.label(c))) for c in columns})
 
 common.footer(acts, states)

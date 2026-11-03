@@ -8,6 +8,7 @@ labels, so the numbers stay numeric (and sortable) while the labels are readable
 from __future__ import annotations
 
 import math
+import re
 
 import pandas as pd
 
@@ -15,6 +16,79 @@ PACE_COLUMNS = ("pace_min_km", "gap_min_km", "median_pace_min_km")
 MAX_TICKS = 6
 _PACE_STEPS = (0.25, 0.5, 1.0, 2.0, 5.0)                 # minutes per km
 _DURATION_STEPS = (60, 120, 300, 600, 900, 1800, 3600)    # seconds
+
+
+LABELS = {
+    "temp_c": "Temperature (°C)", "pace_min_km": "Pace (min/km)", "distance_km": "Distance (km)",
+    "duration_h": "Duration (h)", "duration_min": "Duration (min)", "elevation_m": "Climb (m)",
+    "cumulative_km": "Cumulative km", "day_of_year": "Day of year", "period": "Period",
+    "avg_hr": "Avg HR (bpm)", "max_hr": "Max HR (bpm)", "elev_diff_m": "Climb (m)",
+    "name": "Name", "date": "Date", "place": "Place", "type": "Type", "sport": "Sport",
+    "year": "Year", "kind": "Kind", "lap": "Lap", "time": "Time", "pace": "Pace",
+    "efficiency": "Efficiency (m/min/beat)", "month": "Month", "relative_effort": "Relative effort",
+    "strava_db": "Strava DB", "wellness": "wellness", "plan": "plan", "race_log": "race log",
+    "garmin_activities": "Garmin activities",
+    # Explore axes and dynamics columns
+    "speed_kmh": "Speed (km/h)", "gap_min_km": "Grade-adjusted pace (min/km)",
+    "median_pace_min_km": "Median pace (min/km)", "cadence_spm": "Cadence (spm)",
+    "garmin_cadence_spm": "Garmin cadence (spm)", "avg_cadence_spm": "Cadence (spm)",
+    "feels_like_c": "Feels like (°C)", "humidity_pct": "Humidity (%)",
+    "dew_point_c": "Dew point (°C)", "hour": "Hour of day (h)",
+    "hilliness_m_km": "Hilliness (m/km)", "ground_contact_ms": "Ground contact (ms)",
+    "vertical_oscillation_cm": "Vertical oscillation (cm)", "vertical_ratio_pct": "Vertical ratio (%)",
+    "stride_length_m": "Stride length (m)", "power_w": "Power (W)",
+    "aerobic_te": "Aerobic training effect", "anaerobic_te": "Anaerobic training effect",
+    "garmin_load": "Garmin load", "vo2max": "VO2max", "rank_pct": "Rank percentile (%)",
+    "official_time_s": "Official time (s)", "duration_s": "Duration (s)", "split": "Split (km)",
+    "altitude_m": "Elevation (m)", "hr": "Heart rate (bpm)", "session_type": "Session type",
+    "garmin_url": "Garmin", "strava_url": "Strava", "diploma_url": "Diploma",
+    "surface": "Surface", "grade_class": "Climb or descent",
+}
+
+
+def label(key: str) -> str:
+    """A human label for a column or input name; unknown keys lose their underscores."""
+    return LABELS.get(key, key.replace("_", " "))
+
+
+def shoe_name(name: str) -> str:
+    """Drop the short alias Strava gear names repeat at the end: 'X Wave Rider 28 Wave Rider 28'."""
+    if not isinstance(name, str):
+        return name
+    tag = ""
+    match = re.search(r"\s*(\[[^\]]*\])\s*$", name)
+    if match:
+        tag, name = " " + match.group(1), name[:match.start()]
+    tokens = name.split()
+    for k in range(len(tokens) // 2, 1, -1):
+        tail, head = tokens[-k:], tokens[:-k]
+        if tail == head[-k:] or _in_order(tail, head):
+            return " ".join(head) + tag
+    return name + tag
+
+
+def _in_order(tail: list[str], head: list[str]) -> bool:
+    """Each tail token equals, or is the '-' suffix of, a head token, in order."""
+    position = 0
+    for token in tail:
+        for i in range(position, len(head)):
+            if head[i] == token or head[i].endswith("-" + token):
+                position = i + 1
+                break
+        else:
+            return False
+    return True
+
+
+def day_summary(sports, distances_km) -> str:
+    """Several activities in one cell: '3 walks · 4.9 km', '1 run, 2 walks · 13.6 km'."""
+    counts: dict[str, int] = {}
+    for sport in sports:
+        word = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", str(sport)).lower()
+        counts[word] = counts.get(word, 0) + 1
+    parts = ", ".join(f"{n} {word}{'' if n == 1 else 's'}" for word, n in counts.items())
+    total = sum(float(d) for d in distances_km if _number(d) is not None)
+    return f"{parts} · {total:,.1f} km"
 
 
 def _number(value) -> float | None:
@@ -78,13 +152,13 @@ def duration_ticks(values) -> tuple[list[float], list[str]]:
 
 
 _VALUE_FORMATS = {
-    "km": "{:.1f} km", "m": "{:,.0f} m", "metres": "{:.2f} m", "ratio": "{:.2f}",
+    "km": "{:,.1f} km", "m": "{:,.0f} m", "metres": "{:.2f} m", "ratio": "{:.2f}",
     "count": "{:.1f}", "score": "{:.0f}", "ms": "{:.0f} ms", "bpm": "{:.0f} bpm",
     "hours": "{:.1f} h", "cm": "{:.1f} cm", "pct": "{:.1f} %", "w": "{:.0f} W", "te": "{:.1f}",
     "share": "{:.0f} %", "weeks": "{:.0f} wk",
 }
 _DELTA_FORMATS = {
-    "km": "{:+.1f} km", "m": "{:+,.0f} m", "metres": "{:+.2f} m", "ratio": "{:+.2f}",
+    "km": "{:+,.1f} km", "m": "{:+,.0f} m", "metres": "{:+.2f} m", "ratio": "{:+.2f}",
     "count": "{:+.1f}", "score": "{:+.0f}", "ms": "{:+.0f} ms", "bpm": "{:+.0f} bpm",
     "hours": "{:+.1f} h", "cm": "{:+.1f} cm", "pct": "{:+.1f} %", "w": "{:+.0f} W",
     "te": "{:+.1f}", "share": "{:+.0f} pts", "weeks": "{:+.0f} wk",

@@ -7,6 +7,7 @@ from contextlib import closing
 
 import pandas as pd
 
+from myrun import fmt
 from myrun.activities import activities as _load
 from myrun.config import RUN_SPORTS, Config, load_config
 from myrun.hr import hr_settings
@@ -92,6 +93,7 @@ def shoes(*, cfg: Config | None = None) -> pd.DataFrame:
         if not _NO_GEAR.search(str(exc)):      # any other database error is a real one
             raise
         return pd.DataFrame(columns=columns)
+    df["name"] = df["name"].map(fmt.shoe_name)
     df["last_used"] = pd.to_datetime(df["last_used"]).dt.normalize()
     df["retired"] = df["retired"].astype(bool)
     return df[columns]
