@@ -123,7 +123,8 @@ with tabs[1]:
     st.subheader("Volume")
     left, right = st.columns(2)
     by = left.radio("Per", ["week", "month", "year"], index=1, horizontal=True)
-    measure = right.radio("Measure", ["distance_km", "duration_h", "elevation_m"], horizontal=True)
+    measure = right.radio("Measure", ["distance_km", "duration_h", "elevation_m"],
+                         format_func=fmt.label, horizontal=True)
     st.plotly_chart(common.figure(
         "volume", cfg, lambda: _titled(theme.style(
             px.bar(common.cached("volume", cfg, by), x="period", y=measure, color="sport",

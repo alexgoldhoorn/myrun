@@ -45,6 +45,9 @@ LABELS = {
     "easy_pace": "Easy pace (min/km)", "minutes": "Minutes", "run_km": "Running km",
     "run_minutes": "Running minutes", "m_per_beat": "m per heartbeat",
     "mean_hr": "Mean HR (bpm)", "share_minutes": "% of running minutes", "time_min": "Time (min)",
+    "readiness": "Readiness", "sleep_hours": "Sleep (h)", "hrv_ms": "HRV (ms)",
+    "resting_hr": "Resting HR (bpm)", "body_battery": "Body battery", "stress": "Stress",
+    "distance_m": "Distance (m)", "grade_m_km": "Grade (m/km)",
     "surface": "Surface", "grade_class": "Climb or descent",
 }
 

@@ -118,8 +118,9 @@ else:
     shown["pace"] = shown.pop("pace_min_km").map(fmt.pace)
     shown["time"] = shown.pop("duration_s").map(fmt.duration)
     columns = ["lap", "name", "distance_km", "time", "pace", "avg_hr", "elev_diff_m"]
-    names = {"avg_hr": "Avg HR"}
+    if shown["name"].astype(str).str.fullmatch(r"Lap \d+").all():
+        columns.remove("name")                   # the default names only repeat the lap number
     st.dataframe(shown[columns], hide_index=True, column_config={
-        c: st.column_config.Column(names.get(c, fmt.label(c))) for c in columns})
+        c: st.column_config.Column(fmt.label(c)) for c in columns})
 
 common.footer(acts, states)

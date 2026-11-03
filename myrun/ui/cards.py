@@ -42,7 +42,8 @@ def card_html(metric: Metric) -> str:
 
 
 def row_html(metrics: list[Metric]) -> str:
-    return '<div class="mr-row">' + "".join(card_html(m) for m in metrics) + "</div>"
+    cls = "mr-row mr-row-2" if len(metrics) == 2 else "mr-row"
+    return f'<div class="{cls}">' + "".join(card_html(m) for m in metrics) + "</div>"
 
 
 def card_row(metrics: list[Metric]) -> None:

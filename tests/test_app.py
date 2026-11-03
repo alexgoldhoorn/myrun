@@ -317,6 +317,9 @@ def test_entrypoint_routes_to_the_dashboard(baseline):
     at = run_page("Dashboard.py")
     assert not at.exception
     assert "Dashboard" in [t.value for t in at.title]
+    # AppTest exposes no page_link element; each renders as an unknown element in the phone nav row
+    nav = next(e for e in at.main if getattr(e, "key", None) == "mr-phone-nav")
+    assert len(nav.children) == 4
 
 
 def test_activity_picker_names_the_session_and_the_date(baseline):

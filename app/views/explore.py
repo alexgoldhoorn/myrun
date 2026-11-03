@@ -59,7 +59,7 @@ y_default = "pace_min_km" if "pace_min_km" in numeric else numeric[-1]
 y_choice = middle.selectbox("Y", numeric, format_func=fmt.label, index=numeric.index(y_default))
 group_choice = right.selectbox("Group by", groups)
 
-with st.expander("Per-km bins"):
+with st.expander("Bin sizes"):
     st.caption("Width of the bins used when grouping by, or putting on X, hour of day, "
                "temperature, distance or hilliness.")
     a, b, c, d = st.columns(4)

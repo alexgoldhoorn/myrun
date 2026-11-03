@@ -82,7 +82,7 @@ def _done_text(day, text):
     that_day = acts[acts["date"] == day]
     if len(that_day) > 1:
         return fmt.day_summary(that_day["sport"], that_day["distance_km"])
-    return text
+    return text if isinstance(text, str) and text else "—"
 
 
 done = [_done_text(day, text) for day, text in zip(week["date"], week["actual"])]

@@ -40,7 +40,7 @@ def test_sparkline_needs_two_points_and_survives_a_flat_series():
 
 def test_row_wraps_every_card():
     html = cards.row_html([Metric("a", "A", 1.0, None, "km"), Metric("b", "B", 2.0, None, "km")])
-    assert html.startswith('<div class="mr-row">') and html.count('class="mr-card"') == 2
+    assert html.startswith('<div class="mr-row mr-row-2">') and html.count('class="mr-card"') == 2
 
 
 def test_calendar_is_one_square_per_day_with_escaped_tooltips_and_blank_future_days():
@@ -103,3 +103,9 @@ def test_calendar_has_month_labels_per_week_column_and_outlines_today():
     assert "<span>Oct</span><span></span><span></span></div>" in html     # 1 Oct is in week 0
     assert html.count("mr-day-today") == 1
     assert 'mr-day-0 mr-day-today" title="Wed 14 Oct: rest"' in html          # last non-NaN day
+
+
+def test_row_html_only_two_card_rows_get_the_two_column_class():
+    one, two, three = (Metric(k, k, 1.0, None, "km") for k in "abc")
+    assert "mr-row-2" not in cards.row_html([one])
+    assert "mr-row-2" not in cards.row_html([one, two, three])
