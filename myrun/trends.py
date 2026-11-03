@@ -20,13 +20,17 @@ SHOE_LIMIT_KM = 1000           # confirmed: from here it is due for walking only
 
 
 def volume(by: str = "month", *, activities: pd.DataFrame | None = None,
-           cfg: Config | None = None) -> pd.DataFrame:
-    """Distance, time and elevation per period and sport."""
+           cfg: Config | None = None, group_sports: bool = False) -> pd.DataFrame:
+    """Distance, time and elevation per period and sport.
+
+    With `group_sports` the sport column holds fmt.sport_group names (Run, Trail run, ...)."""
     if by not in _FREQ:
         raise ValueError(f"by must be one of {', '.join(_FREQ)}; got {by!r}")
     acts = activities if activities is not None else _load(cfg=cfg or load_config())
     df = acts.assign(period=acts["date"].dt.to_period(_FREQ[by]).dt.start_time,
                      duration_h=acts["duration_min"] / 60)
+    if group_sports:
+        df["sport"] = df["sport"].map(fmt.sport_group)
     out = df.groupby(["period", "sport"], as_index=False).agg(
         distance_km=("distance_km", "sum"),
         duration_h=("duration_h", "sum"),

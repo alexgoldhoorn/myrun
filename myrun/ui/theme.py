@@ -63,13 +63,17 @@ _RULES = """
 .mr-strip strong { color: var(--mr-text); }
 .mr-cal { display: grid; grid-template-rows: repeat(7, 14px); grid-auto-flow: column;
           grid-auto-columns: 14px; gap: 3px; margin: 0.25rem 0 1rem 0; }
+.mr-cal-labels { display: grid; gap: 3px; font-size: .65rem; color: var(--mr-muted);
+                 margin-top: 0.25rem; white-space: nowrap; }
+.mr-cal-wrap .mr-cal { margin-top: 3px; }
 .mr-day { border-radius: 3px; background: var(--mr-border); }
+.mr-day-today { outline: 2px solid var(--mr-line); outline-offset: 1px; }
 .mr-day-1 { background: var(--mr-line); opacity: 0.35; }
 .mr-day-2 { background: var(--mr-line); opacity: 0.65; }
 .mr-day-3 { background: var(--mr-line); }
 .mr-day-future { background: transparent; border: 1px dashed var(--mr-border); }
 .mr-compact { min-height: 0; padding-bottom: 0.75rem; }
-.mr-row-compact { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.mr-row-compact { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
 .mr-compact .mr-value { font-size: 1.35rem; white-space: nowrap; }
 .mr-links { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0 0 0.75rem 0; }
 .mr-link { border: 1px solid var(--mr-border); border-radius: 0.5rem; padding: 0.35rem 0.8rem;
@@ -79,6 +83,11 @@ _RULES = """
 [data-testid="stMetric"] { background: var(--mr-surface); border: 1px solid var(--mr-border);
                            border-radius: 0.5rem; padding: 0.7rem 1rem; }
 [data-testid="stMetricValue"] { font-variant-numeric: tabular-nums; }
+@media (max-width: 480px) {
+  .mr-row { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.5rem; }
+  .mr-card { min-height: 0; padding: 0.7rem 0.8rem 0.5rem; }
+  .mr-value { font-size: 1.4rem; }
+}
 h1 { font-weight: 650; letter-spacing: -0.01em; }
 h3 { font-size: 1.05rem; font-weight: 600; margin-top: 0.5rem; }
 """

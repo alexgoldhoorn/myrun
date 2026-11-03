@@ -107,7 +107,8 @@ COMPUTE = {
                                                           cfg=cfg),
     "plan_vs_actual": lambda cfg: plan_vs_actual(activities=load_activities(cfg), cfg=cfg),
     "efficiency": lambda cfg: trends.aerobic_efficiency(activities=load_activities(cfg), cfg=cfg),
-    "volume": lambda cfg, by: trends.volume(by, activities=load_activities(cfg)),
+    "volume": lambda cfg, by: trends.volume(by, activities=load_activities(cfg),
+                                           group_sports=True),
     "best_efforts": lambda cfg: trends.best_efforts(cfg=cfg),
     "shoes": lambda cfg: trends.shoes(cfg=cfg),
     "training_days": lambda cfg, weeks: metrics.training_days(

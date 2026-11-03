@@ -126,7 +126,8 @@ with tabs[1]:
     measure = right.radio("Measure", ["distance_km", "duration_h", "elevation_m"], horizontal=True)
     st.plotly_chart(common.figure(
         "volume", cfg, lambda: _titled(theme.style(
-            px.bar(common.cached("volume", cfg, by), x="period", y=measure, color="sport"),
+            px.bar(common.cached("volume", cfg, by), x="period", y=measure, color="sport",
+                    category_orders={"sport": list(fmt.SPORT_GROUPS)}),
             height=360), "period", measure, "sport"),
         by, measure))
     if len(runs):

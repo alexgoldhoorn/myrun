@@ -54,6 +54,17 @@ def label(key: str) -> str:
     return LABELS.get(key, key.replace("_", " "))
 
 
+SPORT_GROUPS = ("Run", "Trail run", "Walk", "Ride", "Other")
+_SPORT_GROUP_OF = {"Run": "Run", "TrailRun": "Trail run", "Walk": "Walk", "Hike": "Walk",
+                   "Ride": "Ride", "VirtualRide": "Ride", "EBikeRide": "Ride",
+                   "GravelRide": "Ride", "MountainBikeRide": "Ride"}
+
+
+def sport_group(sport) -> str:
+    """The coarse group a Strava sport belongs to in the volume chart (one of SPORT_GROUPS)."""
+    return _SPORT_GROUP_OF.get(sport, "Other")
+
+
 def shoe_name(name: str) -> str:
     """Drop the short alias Strava gear names repeat at the end: 'X Wave Rider 28 Wave Rider 28'."""
     if not isinstance(name, str):

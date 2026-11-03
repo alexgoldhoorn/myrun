@@ -58,19 +58,20 @@ if wellness_state.status != "off":
         st.caption(f"Values for {wellness['date'].iloc[-1]:%a %d %b}.")
 
 # ---- charts ---------------------------------------------------------------
+st.caption("Last 12 weeks, by week.")
 left, middle, right = st.columns(3)
 with left:
-    st.subheader("Weekly load")
+    st.subheader("Load")
     st.plotly_chart(common.figure("weekly_load", cfg,
                                   lambda: charts.load_bars(common.cached("weekly_load", cfg, 12))))
-with right:
-    st.subheader("Easy pace, 12 weeks")
-    st.plotly_chart(common.figure(
-        "easy_pace", cfg, lambda: charts.easy_pace_line(common.cached("weekly_runs", cfg, 12))))
 with middle:
-    st.subheader("Weekly running km")
+    st.subheader("Running km")
     st.plotly_chart(common.figure(
         "weekly_km", cfg, lambda: charts.weekly_km_bars(common.cached("weekly_runs", cfg, 12))))
+with right:
+    st.subheader("Easy pace")
+    st.plotly_chart(common.figure(
+        "easy_pace", cfg, lambda: charts.easy_pace_line(common.cached("weekly_runs", cfg, 12))))
 
 # ---- this week ------------------------------------------------------------
 st.subheader("This week")

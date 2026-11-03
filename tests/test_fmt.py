@@ -90,3 +90,10 @@ def test_shoe_name_drops_a_repeated_alias(raw, clean):
 def test_day_summary_counts_sports_and_adds_the_distance():
     assert fmt.day_summary(["Walk", "Walk", "Walk"], [1.5, 1.6, 1.8]) == "3 walks \u00b7 4.9 km"
     assert fmt.day_summary(["Run", "Walk", "Walk"], [10.0, 1.8, 1.8]) == "1 run, 2 walks \u00b7 13.6 km"
+
+
+def test_sport_group_collapses_sports_for_the_volume_chart():
+    assert [fmt.sport_group(s) for s in ("Run", "TrailRun", "Hike", "Walk", "VirtualRide",
+                                         "GravelRide", "WeightTraining", None)] == [
+        "Run", "Trail run", "Walk", "Walk", "Ride", "Ride", "Other", "Other"]
+    assert fmt.SPORT_GROUPS == ("Run", "Trail run", "Walk", "Ride", "Other")

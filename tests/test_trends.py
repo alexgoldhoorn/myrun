@@ -92,3 +92,10 @@ def test_shoes_does_not_hide_other_database_errors(cfg, monkeypatch):
     monkeypatch.setattr(trends, "open_db", broken)
     with pytest.raises(sqlite3.OperationalError, match="no such table: Activity"):
         trends.shoes(cfg=cfg)
+
+
+def test_volume_can_group_sports_for_the_chart(cfg):
+    vol = trends.volume("year", cfg=cfg, group_sports=True)
+    assert set(vol["sport"]) <= {"Run", "Trail run", "Walk", "Ride", "Other"}
+    assert {"Trail run", "Other"} <= set(vol["sport"])          # TrailRun and WeightTraining
+    assert vol["sport"].is_unique

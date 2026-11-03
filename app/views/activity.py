@@ -84,7 +84,7 @@ st.plotly_chart(common.figure("streams", cfg,
                               lambda: charts.stream_figure(data, x=axis, overlay=overlay),
                               activity_id, axis, None if overlay is None else by_label[compare]))
 
-left, right = st.columns(2)
+left, right = st.columns([3, 2])
 with left:
     st.subheader("Time in HR zones")
     heart = common.cached("hr_settings", cfg)

@@ -90,4 +90,16 @@ def test_calendar_marks_an_activity_without_a_duration_as_trained():
                          "activities": [1, 0]})
     html = cards.calendar_html(days)
     assert 'mr-day-1" title="Mon 28 Sep: activity, length unknown"' in html
-    assert 'mr-day-0" title="Tue 29 Sep: rest"' in html
+    assert 'mr-day-0 mr-day-today" title="Tue 29 Sep: rest"' in html
+
+
+def test_calendar_has_month_labels_per_week_column_and_outlines_today():
+    import pandas as pd
+    days = pd.DataFrame({"date": pd.date_range("2026-09-28", periods=21),
+                         "minutes": [0.0] * 17 + [float("nan")] * 4})
+    html = cards.calendar_html(days)
+    assert '<div class="mr-cal-wrap"><div class="mr-cal-labels" ' in html
+    assert 'style="grid-template-columns: repeat(3, 14px)"' in html
+    assert "<span>Oct</span><span></span><span></span></div>" in html     # 1 Oct is in week 0
+    assert html.count("mr-day-today") == 1
+    assert 'mr-day-0 mr-day-today" title="Wed 14 Oct: rest"' in html          # last non-NaN day

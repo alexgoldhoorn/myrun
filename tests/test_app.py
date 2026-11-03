@@ -285,7 +285,7 @@ def test_trends_page_hides_vo2max_and_intensity_without_the_feed(baseline):
 
 def test_dashboard_third_round_sections(everything):
     text = _text(run_page("views/dashboard.py"))
-    for label in ("Weeks in a row", "Garmin load", "Easy pace, 12 weeks", "Training days",
+    for label in ("Weeks in a row", "Garmin load", "Easy pace", "Last 12 weeks, by week.", "Training days",
                   "Race build-up"):
         assert label in text
 

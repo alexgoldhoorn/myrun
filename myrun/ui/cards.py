@@ -84,25 +84,52 @@ def note_html(text: str) -> str:
 _DAY_LEVELS = (30, 60)       # minutes: under 30 is light, under 60 medium, the rest full
 
 
-def calendar_html(days) -> str:
-    """Training days as a grid, one column per week (Monday on top); '' without days.
+def _month_labels(days) -> list[str]:
+    """One entry per week column: the month's short name for the first column and for each
+    week holding the first day of a month, else ''."""
+    labels, previous = [], None
+    dates = list(days["date"])
+    for start in range(0, len(dates), 7):
+        week = dates[start:start + 7]
+        first_of_month = next((d for d in week if d.day == 1), None)
+        if first_of_month is not None:
+            labels.append(f"{first_of_month:%b}")
+        elif previous is None:
+            labels.append(f"{week[0]:%b}")
+        else:
+            labels.append("")
+        previous = labels[-1]
+    return labels
 
-    `days` has `date` and `minutes`; NaN minutes mark days that have not happened yet."""
+
+def calendar_html(days) -> str:
+    """Training days as a grid, one column per week (Monday on top), under a row of month
+    names; '' without days.
+
+    `days` has `date` and `minutes`; NaN minutes mark days that have not happened yet.
+    The last day that is not NaN is today and is outlined."""
     if len(days) == 0:
         return ""
+    played = days["minutes"].notna()
+    today = days["date"][played].max() if played.any() else None
     squares = []
     for row in days.itertuples(index=False):
         if row.minutes != row.minutes:                       # NaN: a future day
             squares.append('<span class="mr-day mr-day-future"></span>')
             continue
+        marker = " mr-day-today" if row.date == today else ""
         unknown = row.minutes <= 0 and getattr(row, "activities", 0) > 0
         level = 1 if unknown else 0 if row.minutes <= 0 else 1 + sum(
             row.minutes >= edge for edge in _DAY_LEVELS)
         text = ("activity, length unknown" if unknown else "rest" if level == 0
                 else f"{row.minutes:.0f} min")
-        squares.append(f'<span class="mr-day mr-day-{level}" '
+        squares.append(f'<span class="mr-day mr-day-{level}{marker}" '
                        f'title="{escape(f"{row.date:%a %d %b}: {text}")}"></span>')
-    return f'<div class="mr-cal">{"".join(squares)}</div>'
+    names = _month_labels(days)
+    labels = "".join(f"<span>{escape(name)}</span>" for name in names)
+    return (f'<div class="mr-cal-wrap">'
+            f'<div class="mr-cal-labels" style="grid-template-columns: repeat({len(names)}, 14px)">'
+            f'{labels}</div><div class="mr-cal">{"".join(squares)}</div></div>')
 
 
 def readiness_html(ready: dict | None) -> str:

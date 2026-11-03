@@ -60,3 +60,9 @@ def test_the_menu_that_switches_light_and_dark_is_shown():
     from pathlib import Path
     config = tomllib.loads((Path(__file__).parents[1] / ".streamlit/config.toml").read_text())
     assert config["client"]["toolbarMode"] == "viewer"
+
+
+def test_phone_rules_and_calendar_styles_exist():
+    from myrun.ui import theme
+    assert "@media (max-width: 480px)" in theme.CSS and ".mr-day-today" in theme.CSS
+    assert ".mr-cal-labels" in theme.CSS and "minmax(130px, 1fr)" in theme.CSS

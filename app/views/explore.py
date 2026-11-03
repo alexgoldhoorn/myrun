@@ -26,11 +26,11 @@ if df.empty:
 
 # ---- filters --------------------------------------------------------------
 with st.expander("Filters", expanded=True):
-    left, middle, right = st.columns(3)
     first, last = df["date"].min().date(), df["date"].max().date()
-    period = left.date_input("Dates", (first, last), min_value=first, max_value=last)
+    period = st.date_input("Dates", (first, last), min_value=first, max_value=last)
+    left, right = st.columns(2)
     sports = sorted(df["sport"].dropna().unique())
-    chosen_sports = middle.multiselect("Sport", sports,
+    chosen_sports = left.multiselect("Sport", sports,
                                        default=[s for s in sports if s in RUN_SPORTS] or sports)
     session_types = sorted(df["session_type"].dropna().unique())
     chosen_types = right.multiselect("Session type", session_types) if session_types else []
@@ -59,7 +59,9 @@ y_default = "pace_min_km" if "pace_min_km" in numeric else numeric[-1]
 y_choice = middle.selectbox("Y", numeric, format_func=fmt.label, index=numeric.index(y_default))
 group_choice = right.selectbox("Group by", groups)
 
-with st.expander("Block sizes"):
+with st.expander("Per-km bins"):
+    st.caption("Width of the bins used when grouping by, or putting on X, hour of day, "
+               "temperature, distance or hilliness.")
     a, b, c, d = st.columns(4)
     blocks = {
         "hour_block": a.number_input("Hour of day (h)", 1, 12, 3),
