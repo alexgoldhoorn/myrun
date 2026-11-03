@@ -64,7 +64,7 @@ def test_plan_ok_stale_and_malformed(cfg, tmp_path):
     assert df["distance_km"].iloc[0] == 10.0 and pd.isna(df["distance_km"].iloc[2])
 
     df, state = optional.read_plan(c, today="2027-03-01")     # nothing planned that week
-    assert state.status == "stale" and df is not None and "week" in state.message
+    assert state.status == "empty" and df is not None and "week" in state.message
 
     bad = tmp_path / "bad.csv"
     bad.write_text("date,session,type,distance_km\nnot-a-date,Easy,easy,5\n")

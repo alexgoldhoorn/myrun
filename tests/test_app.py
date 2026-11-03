@@ -12,7 +12,7 @@ from tests.fixture import (RACE_COLUMNS, build_fixture, write_garmin_csv, write_
                            write_wellness)
 
 ROOT = Path(__file__).resolve().parents[1]
-PAGES = ["Dashboard.py", "pages/1_Trends.py", "pages/2_Activity.py", "pages/3_Explore.py"]
+PAGES = ["views/dashboard.py", "views/trends.py", "views/activity.py", "views/explore.py"]
 
 
 def write_config(tmp_path, db, **inputs) -> Path:
@@ -134,7 +134,7 @@ def test_stale_wellness_hides_recovery_values(everything, tmp_path):
 
     old = time.time() - 50 * 3600
     os.utime(tmp_path / "w.parquet", (old, old))
-    at = run_page("Dashboard.py")
+    at = run_page("views/dashboard.py")
     assert not at.exception
     assert any("wellness" in str(w.value) for w in at.warning)
     assert "Values for" not in _text(at)
@@ -142,13 +142,13 @@ def test_stale_wellness_hides_recovery_values(everything, tmp_path):
 
 def test_missing_database_is_one_clear_error(tmp_path, monkeypatch):
     monkeypatch.setenv("MYRUN_CONFIG", str(write_config(tmp_path, tmp_path / "absent.db")))
-    at = run_page("Dashboard.py")
+    at = run_page("views/dashboard.py")
     assert not at.exception
     assert len(at.error) == 1 and "not found" in at.error[0].value
 
 
 def test_dashboard_content_baseline(baseline):
-    text = _text(run_page("Dashboard.py"))
+    text = _text(run_page("views/dashboard.py"))
     for label in ("This week", "Last 4 weeks", "Year to date", "Load, 7 days vs 4 weeks",
                   "Easy pace", "Longest run, 4 weeks", "Runs per week", "Recent runs"):
         assert label in text
@@ -156,25 +156,25 @@ def test_dashboard_content_baseline(baseline):
 
 
 def test_dashboard_content_with_inputs(everything):
-    text = _text(run_page("Dashboard.py"))
+    text = _text(run_page("views/dashboard.py"))
     assert "Next race" in text and "Trail Race 23km" in text
     assert "Recovery" in text and "Readiness" in text and "Values for" in text
     assert "connect.garmin.com" not in text                        # links live in the table
 
 
 def test_dashboard_names_a_broken_input(broken_inputs):
-    at = run_page("Dashboard.py")
+    at = run_page("views/dashboard.py")
     warnings = "\n".join(str(w.value) for w in at.warning)
     assert "wellness" in warnings and "plan" in warnings
 
 
 def test_dashboard_opens_a_run_on_the_activity_page(baseline):
-    at = run_page("Dashboard.py")
+    at = run_page("views/dashboard.py")
     assert not at.exception and len(at.dataframe) >= 2             # this week, recent runs
 
 
 def test_trends_page_content(everything):
-    text = _text(run_page("pages/1_Trends.py"))
+    text = _text(run_page("views/trends.py"))
     for heading in ("Aerobic efficiency", "Volume", "Best efforts", "Races", "Wellness",
                     "Like for like, year on year", "heart rate by pace band",
                     "Training mix per year"):
@@ -182,20 +182,20 @@ def test_trends_page_content(everything):
 
 
 def test_trends_page_hides_optional_sections(baseline):
-    text = _text(run_page("pages/1_Trends.py"))
+    text = _text(run_page("views/trends.py"))
     assert "Aerobic efficiency" in text
     assert "Races" not in text and "Wellness" not in text
 
 
 def test_activity_page_shows_the_newest_activity_with_streams(baseline):
-    at = run_page("pages/2_Activity.py")
+    at = run_page("views/activity.py")
     text = _text(at)
     assert "HR drift" in text and "Time in HR zones" in text and "Laps" in text
     assert 'class="mr-link" href="https://www.strava.com/activities/1"' in _text(at)
 
 
 def test_activity_page_handles_an_activity_without_stream_data(baseline):
-    at = run_page("pages/2_Activity.py")
+    at = run_page("views/activity.py")
     options = at.selectbox[0].options
     target = next(o for o in options if "5.0 km" in o)        # the run with no stream rows
     at.selectbox[0].select(target).run()
@@ -204,7 +204,7 @@ def test_activity_page_handles_an_activity_without_stream_data(baseline):
 
 
 def test_explore_page_per_km_level(baseline):
-    at = run_page("pages/3_Explore.py")
+    at = run_page("views/explore.py")
     at.radio[0].set_value("per km").run()
     assert not at.exception
     group = next(s for s in at.selectbox if s.label == "Group by")
@@ -212,86 +212,86 @@ def test_explore_page_per_km_level(baseline):
 
 
 def test_explore_page_offers_dynamics_only_with_the_garmin_input(baseline):
-    y = next(s for s in run_page("pages/3_Explore.py").selectbox if s.label == "Y")
+    y = next(s for s in run_page("views/explore.py").selectbox if s.label == "Y")
     assert "ground_contact_ms" not in y.options
 
 
 def test_explore_page_offers_dynamics_with_the_garmin_input(everything):
-    y = next(s for s in run_page("pages/3_Explore.py").selectbox if s.label == "Y")
+    y = next(s for s in run_page("views/explore.py").selectbox if s.label == "Y")
     assert "ground_contact_ms" in y.options
 
 
 def test_pages_say_where_the_hr_zones_come_from(baseline):
-    assert "observed" in _text(run_page("pages/2_Activity.py"))
-    assert "observed" in _text(run_page("pages/1_Trends.py"))
+    assert "observed" in _text(run_page("views/activity.py"))
+    assert "observed" in _text(run_page("views/trends.py"))
 
 
 def test_activity_page_shows_pace_as_minutes_and_seconds(baseline):
-    at = run_page("pages/2_Activity.py")
+    at = run_page("views/activity.py")
     assert ('<div class="mr-label">Pace</div><div class="mr-value">5:33 /km</div>'
             in _text(at))                                  # 40 min over 7.2 km
 
 
 def test_activity_page_shows_running_dynamics_with_the_feed(everything):
-    at = run_page("pages/2_Activity.py")
+    at = run_page("views/activity.py")
     assert "Running dynamics" in _text(at)
     assert "Ground contact" in _text(at) and "250 ms" in _text(at)
     assert "connect.garmin.com/modern/activity/111" in _text(at)
 
 
 def test_activity_page_hides_running_dynamics_without_the_feed(baseline):
-    assert "Running dynamics" not in _text(run_page("pages/2_Activity.py"))
+    assert "Running dynamics" not in _text(run_page("views/activity.py"))
 
 
 def test_trends_page_shows_running_dynamics_with_the_feed(everything):
-    assert "Running dynamics" in _text(run_page("pages/1_Trends.py"))
+    assert "Running dynamics" in _text(run_page("views/trends.py"))
 
 
 def test_trends_page_hides_running_dynamics_without_the_feed(baseline):
-    assert "Running dynamics" not in _text(run_page("pages/1_Trends.py"))
+    assert "Running dynamics" not in _text(run_page("views/trends.py"))
 
 
 def test_dashboard_shows_a_changed_plan_without_a_restart(everything, tmp_path):
-    assert "Trail Race 23km" in _text(run_page("Dashboard.py"))
+    assert "Trail Race 23km" in _text(run_page("views/dashboard.py"))
     plan = tmp_path / "plan.csv"
     plan.write_text(plan.read_text().replace("Trail Race 23km", "Night Race 30km"))
     stamp = plan.stat().st_mtime + 60
     os.utime(plan, (stamp, stamp))
-    text = _text(run_page("Dashboard.py"))
+    text = _text(run_page("views/dashboard.py"))
     assert "Night Race 30km" in text and "Trail Race 23km" not in text
 
 
 def test_dashboard_shows_the_second_round_of_cards(everything):
-    text = _text(run_page("Dashboard.py"))
+    text = _text(run_page("views/dashboard.py"))
     for label in ("Plan done", "Easy share", "VO2max"):
         assert label in text
 
 
 def test_dashboard_hides_cards_whose_input_is_not_configured(baseline):
-    text = _text(run_page("Dashboard.py"))
+    text = _text(run_page("views/dashboard.py"))
     for label in ("Plan done", "Easy share", "VO2max"):
         assert label not in text
 
 
 def test_trends_page_shows_vo2max_and_intensity_with_the_feed(everything):
-    text = _text(run_page("pages/1_Trends.py"))
+    text = _text(run_page("views/trends.py"))
     assert "VO2max" in text and "Intensity" in text
 
 
 def test_trends_page_hides_vo2max_and_intensity_without_the_feed(baseline):
-    text = _text(run_page("pages/1_Trends.py"))
+    text = _text(run_page("views/trends.py"))
     assert "VO2max" not in text and "Intensity" not in text
 
 
 def test_dashboard_third_round_sections(everything):
-    text = _text(run_page("Dashboard.py"))
+    text = _text(run_page("views/dashboard.py"))
     for label in ("Weeks in a row", "Garmin load", "Easy pace, 12 weeks", "Training days",
                   "Race build-up"):
         assert label in text
 
 
 def test_dashboard_third_round_without_optional_inputs(baseline):
-    text = _text(run_page("Dashboard.py"))
+    text = _text(run_page("views/dashboard.py"))
     assert "Weeks in a row" in text and "Training days" in text
     assert "Garmin load" not in text and "Race build-up" not in text
 
@@ -305,9 +305,15 @@ def test_explore_builds_its_chart_once_per_choice(baseline, monkeypatch):
         return real(*args, **kwargs)
 
     monkeypatch.setattr(charts, "explore_figure", counting)
-    at = run_page("pages/3_Explore.py")
+    at = run_page("views/explore.py")
     at.run()                                         # a rerun with the same choices
     assert not at.exception and len(built) == 1
     at.selectbox[1].set_value("distance_km").run()   # another Y axis is another chart
     assert not at.exception and len(built) == 2
     assert "rows have both values" in _text(at)
+
+
+def test_entrypoint_routes_to_the_dashboard(baseline):
+    at = run_page("Dashboard.py")
+    assert not at.exception
+    assert "Dashboard" in [t.value for t in at.title]

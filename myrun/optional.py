@@ -1,7 +1,7 @@
 """Optional inputs: wellness, plan, race log, Garmin activities.
 
 Each reader returns (frame, state). The frame is None when the input is not configured
-("off") or cannot be used ("error"); it is present for "ok" and "stale". Pages decide
+("off") or cannot be used ("error"); it is present for "ok", "empty" and "stale". Pages decide
 what to show from the state; nothing here raises for a bad file.
 """
 
@@ -40,7 +40,7 @@ def none_if_missing(values) -> pd.Series:
 @dataclass(frozen=True)
 class InputState:
     name: str
-    status: str            # off | ok | stale | error
+    status: str            # off | ok | empty | stale | error
     age_hours: float | None = None
     message: str = ""
 
@@ -141,7 +141,7 @@ def read_plan(cfg: Config, today=None):
     monday = now - pd.Timedelta(days=now.weekday())
     in_week = df["date"].between(monday, monday + pd.Timedelta(days=6))
     if not in_week.any():
-        return df, InputState(name, "stale", None, "no sessions planned for the current week")
+        return df, InputState(name, "empty", None, "no sessions planned for the current week")
     return df, InputState(name, "ok")
 
 

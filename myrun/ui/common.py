@@ -23,7 +23,8 @@ from myrun.ui import theme
 
 def setup(title: str) -> Config:
     """First call of every page. Stops the page with one error if it cannot start."""
-    st.set_page_config(page_title=f"myrun · {title}", layout="wide")
+    if not st.session_state.get("_mr_nav"):   # the router in app/Dashboard.py sets this itself
+        st.set_page_config(page_title=f"myrun · {title}", layout="wide")
     theme.apply()
     try:
         cfg = load_config()
@@ -186,12 +187,17 @@ def notice(state: InputState) -> bool:
 FEEDS_ACTIVITIES = ("plan", "race_log", "garmin_activities")
 
 
-def banner(states: dict[str, InputState]) -> None:
+def banner(states: dict[str, InputState], page: str = "") -> None:
     strava = states["strava_db"]
     if strava.status != "ok":
         st.error(f"**Activities may be out of date**: {strava.message}")
     for name in FEEDS_ACTIVITIES:
-        notice(states[name])
+        state = states[name]
+        if state.status == "empty":     # a status, not a fault: only the Dashboard says it
+            if page == "Dashboard":
+                st.info(f"**{state.name}**: {state.message}")
+            continue
+        notice(state)
 
 
 def footer(acts: pd.DataFrame, states: dict[str, InputState]) -> None:
