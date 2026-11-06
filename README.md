@@ -6,10 +6,7 @@ that tool's SQLite database (read-only), adds optional wellness, plan, race and 
 and answers four questions in a [Streamlit](https://streamlit.io) app. It never contacts
 Strava or Garmin, so it needs no API keys and runs entirely on your own machine.
 
-<!-- TODO: add docs/screenshot-dashboard.png (Dashboard page, synthetic demo data) and uncomment
-![Dashboard](docs/screenshot-dashboard.png)
--->
-*Screenshot: coming soon.*
+![Dashboard page on the synthetic demo data](docs/screenshot-dashboard.png)
 
 - **Dashboard**: cards for volume (with the share of the plan done), load and fitness
   (with VO2max and the easy share of running time, from the Garmin input), and recovery,
