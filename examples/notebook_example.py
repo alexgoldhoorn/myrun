@@ -1,7 +1,7 @@
 """The same numbers the dashboard shows, in a notebook.
 
 Paste the cells into Jupyter, or run this file. It reads the config named by
-MYRUN_CONFIG (default ~/dockers/myrun/config.yaml).
+MYRUN_CONFIG (default ~/.config/myrun/config.yaml).
 """
 
 import myrun

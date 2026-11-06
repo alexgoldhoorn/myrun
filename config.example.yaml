@@ -1,4 +1,4 @@
-# Copy to ~/dockers/myrun/config.yaml (or point MYRUN_CONFIG at your copy).
+# Copy to ~/.config/myrun/config.yaml (or point MYRUN_CONFIG at your copy).
 # Only strava_db is required. Unknown keys are an error.
 
 strava_db: /path/to/statistics-for-strava/storage/database/strava.db

@@ -1,9 +1,15 @@
 # myrun
 
-A personal training dashboard that sits on top of a
-[statistics-for-strava](https://github.com/robiningelbrecht/statistics-for-strava)
-database. It answers four questions, and links out to Strava, Garmin Connect and
-statistics-for-strava for everything else.
+A self-hosted training dashboard for runners who already keep their data in
+[statistics-for-strava](https://github.com/robiningelbrecht/statistics-for-strava). It reads
+that tool's SQLite database (read-only), adds optional wellness, plan, race and Garmin files,
+and answers four questions in a [Streamlit](https://streamlit.io) app. It never contacts
+Strava or Garmin, so it needs no API keys and runs entirely on your own machine.
+
+<!-- TODO: add docs/screenshot-dashboard.png (Dashboard page, synthetic demo data) and uncomment
+![Dashboard](docs/screenshot-dashboard.png)
+-->
+*Screenshot: coming soon.*
 
 - **Dashboard**: cards for volume (with the share of the plan done), load and fitness
   (with VO2max and the easy share of running time, from the Garmin input), and recovery,
@@ -39,13 +45,59 @@ Four more inputs are optional. Leave one out and its panels disappear.
 Garmin activities are matched to Strava activities by start time, because the two
 share no identifier.
 
-## Run it
+## Quick start
+
+Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
+
+**Try it with synthetic data** (no Strava account needed):
+
+```bash
+git clone <this repo> && cd myrun
+uv sync
+uv run python examples/make_demo_data.py demo
+MYRUN_CONFIG=demo/config.yaml uv run streamlit run app/Dashboard.py
+```
+
+**Against your own statistics-for-strava database:**
 
 ```bash
 uv sync
-cp config.example.yaml ~/my-myrun-config.yaml      # then edit strava_db and your HR zones
-MYRUN_CONFIG=~/my-myrun-config.yaml uv run streamlit run app/Dashboard.py
+mkdir -p ~/.config/myrun && cp config.example.yaml ~/.config/myrun/config.yaml
+# edit it: set strava_db to .../statistics-for-strava/storage/database/strava.db
+uv run streamlit run app/Dashboard.py
 ```
+
+The database is opened read-only, so you can point at the live file (a WAL database reads
+fine). Set the optional `inputs:` in the config as you get the files.
+
+## Configuration
+
+All settings live in one YAML file, documented line by line in `config.example.yaml`. Unknown
+keys are an error. Only `strava_db` is required. These environment variables apply:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `MYRUN_CONFIG` | `~/.config/myrun/config.yaml` | Path of the config file (the app, the notebook API and `python -m myrun.report` all read it) |
+| `MYRUN_CACHE_LOG` | unset | Set to `1` to log every result-cache miss and which thread paid for it |
+| `MYRUN_DENY_PATTERNS` | `~/.config/myrun/deny-patterns.txt` | Contributors only: the pre-commit guard's list of personal strings (see Development) |
+
+## Docker
+
+```bash
+docker build -t myrun .
+docker run -p 8501:8501 \
+  -v /path/to/statistics-for-strava/storage/database:/data:ro \
+  -v /path/to/your/inputs:/inputs:ro \
+  -v /path/to/config.yaml:/config/config.yaml:ro \
+  -v myrun-cache:/cache \
+  myrun
+```
+
+Use container paths in that config file: `strava_db: /data/strava.db`, `/inputs/...` for the
+optional inputs, `cache_dir: /cache`. The image runs as UID 1000, so the mounted files must be
+readable by it and the cache volume writable (the container's `HOME` is `/tmp`).
+
+Text reports for scripts or chat tools: `uv run python -m myrun.report fitness|race|dashboard|status`.
 
 To have the numbers ready before the first visit, start it through the launcher instead:
 `uv run python -m myrun.ui.warm run app/Dashboard.py`. It takes the same arguments as
@@ -82,3 +134,16 @@ See `examples/notebook_example.py`.
 uv run pytest -q
 sh scripts/git-hooks/install.sh
 ```
+
+The tests build a synthetic database (`tests/fixture.py`); no real data is needed or present.
+The hook blocks data files (`.db`, `.csv`, `.parquet`, `.fit`, `config.yaml`, ...) and runs the
+tests. If you keep a list of personal strings (hostnames, your name, a home path), one regex
+per line in `~/.config/myrun/deny-patterns.txt`, it also rejects staged files that match; without
+that file the check is skipped with a warning.
+
+## License
+
+MIT, see `LICENSE`. The bundled Inter font is under the SIL Open Font License 1.1
+(`app/static/FONT-LICENSE.md`). Dependencies (numpy, pandas, pyarrow, PyYAML, zstandard,
+Streamlit, Plotly) are BSD, MIT or Apache-2.0 licensed. This project is not affiliated with
+Strava, Garmin or statistics-for-strava.

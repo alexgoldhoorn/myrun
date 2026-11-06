@@ -3,6 +3,8 @@ name = "myrun"
 version = "0.1.0"
 description = "A personal training dashboard on top of a statistics-for-strava database."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
     "numpy>=1.26",

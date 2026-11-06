@@ -9,7 +9,7 @@ from pathlib import Path
 
 import yaml
 
-DEFAULT_CONFIG = "~/dockers/myrun/config.yaml"
+DEFAULT_CONFIG = "~/.config/myrun/config.yaml"
 RUN_SPORTS = ("Run", "TrailRun")
 
 

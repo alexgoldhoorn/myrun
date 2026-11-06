@@ -2,7 +2,7 @@
 
 Scans the staged version of each file. Deny patterns (one case-insensitive regex per
 line, # for comments) come from an untracked file: $MYRUN_DENY_PATTERNS, default
-~/dockers/myrun/deny-patterns.txt. Without that file the pattern check is skipped with
+~/.config/myrun/deny-patterns.txt. Without that file the pattern check is skipped with
 a warning, because clones do not have it. A match is reported by file, line and
 pattern number, never by the matched text.
 """
@@ -15,7 +15,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-DEFAULT_DENY_FILE = "~/dockers/myrun/deny-patterns.txt"
+DEFAULT_DENY_FILE = "~/.config/myrun/deny-patterns.txt"
 FORBIDDEN_SUFFIXES = (".db", ".sqlite", ".sqlite3", ".duckdb", ".parquet", ".wal", ".csv", ".fit",
                       ".gpx", ".tcx", ".jsonl")
 FORBIDDEN_NAMES = ("config.yaml",)
