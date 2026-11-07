@@ -8,6 +8,9 @@ inputs:                               # each is optional; leave out what you do 
   wellness_parquet:                   # columns: date, readiness, sleep_hours, hrv_ms, resting_hr,
                                       #   body_battery, stress
   plan_csv:                           # columns: date, session, type, distance_km
+                                      #   Optional: surface (road, mixed, trail), elevation_m
+                                      #   type "race" marks a race; "rest" and "strength" are
+                                      #   not runs.
   race_log_csv:                       # your own columns, mapped below
   garmin_activities:                  # .csv or .parquet. Required column: start (local time).
                                       #   Optional: garmin_activity_id, session_name,
@@ -24,6 +27,8 @@ race_log_columns:                     # field: header in your CSV. name and date
   official_time: official_time        # HH:MM:SS
   rank_pct: rank_pct
   garmin_url: garmin_url
+  # Any other field you map is shown in the races table on the Trends page. Links:
+  # strava_url, diploma_url. Text: place.
 race_log_date_format: "%d/%m/%Y"
 
 wellness_columns:                     # only if your file uses other names. field: your column
@@ -59,3 +64,7 @@ thresholds:
   load_bands: [0.8, 1.3, 1.5]
   stale_hours: 36
   garmin_join_tolerance_s: 120
+
+# devices:                            # watches bought second hand: activities recorded on one
+#   - {name: "Garmin Forerunner 245", owned_from: 2022-03-01}   # before owned_from are dropped.
+#                                     # name is the device name as Strava records it.
