@@ -1,4 +1,9 @@
-"""Configuration: one YAML file kept outside the repo."""
+"""Configuration: one YAML file kept outside the repo.
+
+`load_config()` reads the file named by its argument, else `$MYRUN_CONFIG`, else
+`~/.config/myrun/config.yaml`. Every library function takes an optional `cfg=` and loads
+the default config when it is None. See `config.example.yaml` for every key.
+"""
 
 from __future__ import annotations
 
@@ -14,11 +19,17 @@ RUN_SPORTS = ("Run", "TrailRun")
 
 
 class ConfigError(Exception):
-    pass
+    """The config file is missing, unreadable or has an unknown or invalid key."""
 
 
 @dataclass(frozen=True)
 class Config:
+    """The parsed config file. Field names differ a little from the YAML keys
+    (`sfs_url` is `links.statistics_for_strava_url`, `hr_*` are under `hr:`,
+    `device_owned_from` is `devices:`); `load_config()` does the mapping.
+
+    Paths are expanded (`~`) but not checked: a missing input file shows up as an
+    "error" state in `input_status()`, not as an exception here."""
     strava_db: Path
     cache_dir: Path = Path(os.path.expanduser("~/.cache/myrun"))
     wellness_parquet: Path | None = None
@@ -94,6 +105,8 @@ def _devices(items, source: Path) -> dict[str, date]:
 
 
 def load_config(path: str | Path | None = None) -> Config:
+    """Read and validate the config file. Raises ConfigError for a missing file, an unknown
+    key (a typo must not be silently ignored), or a value of the wrong shape."""
     source = Path(os.path.expanduser(str(path or os.environ.get("MYRUN_CONFIG") or DEFAULT_CONFIG)))
     if not source.is_file():
         raise ConfigError(f"config file not found: {source}")

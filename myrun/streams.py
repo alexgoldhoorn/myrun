@@ -110,6 +110,8 @@ def drift_pct(streams_df: pd.DataFrame, min_minutes: float = 30) -> float | None
 
 
 def hr_zones(activity_id: str, *, cfg: Config | None = None) -> pd.DataFrame:
+    """Time in each heart-rate zone for one activity (columns zone, lower, upper, seconds,
+    pct). Empty when no zones can be worked out; see hr.hr_settings."""
     cfg = cfg or load_config()
     bounds = hr_settings(cfg).zone_upper_bounds
     if bounds is None:
@@ -118,11 +120,15 @@ def hr_zones(activity_id: str, *, cfg: Config | None = None) -> pd.DataFrame:
 
 
 def hr_drift(activity_id: str, *, cfg: Config | None = None) -> float | None:
+    """Heart-rate drift of one activity in percent (see drift_pct), or None for runs under
+    30 minutes or without heart-rate and speed streams."""
     cfg = cfg or load_config()
     return drift_pct(activity_streams(activity_id, cfg=cfg))
 
 
 def activity_laps(activity_id: str, *, cfg: Config | None = None) -> pd.DataFrame:
+    """Laps of one activity: lap, name, distance_km, duration_s, pace_min_km, avg_hr,
+    elev_diff_m. Laps are the ones the watch or the workout recorded, not km splits."""
     cfg = cfg or load_config()
     with closing(open_db(cfg)) as conn:
         laps = pd.read_sql_query(

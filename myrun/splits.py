@@ -100,7 +100,15 @@ def _metrics(cfg: Config, rows: pd.DataFrame, with_streams: set[str]) -> pd.Data
 
 
 def splits(since=None, *, cfg: Config | None = None) -> pd.DataFrame:
-    """One row per metric km split of every run, with the run's categories attached."""
+    """One row per metric km split of every run, with the run's categories attached.
+
+    Columns: activity_id, split (1-based), distance_m, duration_s, pace_min_km, gap_min_km
+    (grade-adjusted pace), elev_diff_m, grade_m_km, grade_class (climb, flat or descent),
+    avg_hr and avg_cadence_spm (from the streams; NaN without them), and the run's date,
+    hour, year, sport, surface, session_type, temp_c and hilliness_m_km.
+
+    Partial last splits under 500 m are dropped. The first call decodes streams and is slow;
+    later calls read the Parquet cache in `cfg.cache_dir`."""
     cfg = cfg or load_config()
     with closing(open_db(cfg)) as conn:
         rows = pd.read_sql_query(_SQL, conn)

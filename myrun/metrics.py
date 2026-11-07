@@ -74,7 +74,11 @@ def _tone(value, previous, higher_is_better: bool) -> str:
 
 def weekly_runs(weeks: int = TREND_WEEKS, *, activities: pd.DataFrame | None = None, today=None,
                 cfg: Config | None = None) -> pd.DataFrame:
-    """Running per week (Monday start), oldest first, the current week last."""
+    """Running per week (Monday start), oldest first, the current week last.
+
+    Columns: week_start, run_km, elevation_m, longest_km, n_runs, easy_pace_min_km (median
+    pace of easy runs, NaN when there were none) and planned_km (from the plan input, NaN
+    without one). Weeks without runs are present with zeros."""
     cfg = cfg or load_config()
     acts = activities if activities is not None else _load(cfg=cfg)
     now = _now(today)

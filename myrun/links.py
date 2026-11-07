@@ -10,6 +10,7 @@ def strava_url(activity_id: str) -> str:
 
 
 def sfs_url(base: str | None, activity_id: str) -> str | None:
+    """Link to the activity in your statistics-for-strava site; None when `base` is unset."""
     return f"{base.rstrip('/')}/activities/{activity_id}" if base else None
 
 

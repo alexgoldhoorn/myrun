@@ -381,6 +381,7 @@ def intensity_yearly(*, activities: pd.DataFrame | None = None, cfg: Config | No
 
 
 def since_year(frame: pd.DataFrame, first_year: int, column: str = "period") -> pd.DataFrame:
+    """Rows of `frame` whose `column` (a year, or a date) is `first_year` or later."""
     if frame.empty:
         return frame
     values = frame[column]
@@ -389,4 +390,5 @@ def since_year(frame: pd.DataFrame, first_year: int, column: str = "period") -> 
 
 
 def default_first_year(today=None) -> int:
+    """Five years before this one: how far back the by-band tables start by default."""
     return pd.Timestamp(today if today is not None else date.today()).year - 5

@@ -44,6 +44,10 @@ def bin_label(values: pd.Series, width: float) -> pd.Series:
 
 
 def load_label(ratio: float | None, bands: tuple[float, float, float]) -> str:
+    """Name a load ratio (last 7 days over the weekly average of the last 28).
+
+    `bands` is (low, high, very_high), the config's `thresholds.load_bands`: below `low` is
+    "low", up to `high` "steady", up to `very_high` "high", above that "very high"."""
     if ratio is None:
         return "no data"
     low, high, very_high = bands

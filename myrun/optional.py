@@ -39,6 +39,9 @@ def none_if_missing(values) -> pd.Series:
 
 @dataclass(frozen=True)
 class InputState:
+    """Health of one input. `stale` means the file is older than `thresholds.stale_hours`;
+    `empty` means it read fine but holds nothing for the current period; `error` carries
+    the reason in `message`."""
     name: str
     status: str            # off | ok | empty | stale | error
     age_hours: float | None = None
@@ -71,6 +74,11 @@ def _file_state(name: str, path: Path, cfg: Config, now: float | None) -> InputS
 
 
 def read_wellness(cfg: Config, now: float | None = None):
+    """Daily wellness from a Parquet file, one row per day, sorted by date.
+
+    Needs a `date` column and at least one of WELLNESS_COLUMNS. `wellness_columns` in the
+    config renames other headers; `sleep_seconds` is converted to `sleep_hours`. Numbers
+    become float64. Returns (frame, InputState) like the other readers."""
     name, path = "wellness", cfg.wellness_parquet
     if path is None:
         return _off(name)
@@ -107,6 +115,12 @@ def read_wellness(cfg: Config, now: float | None = None):
 
 
 def read_plan(cfg: Config, today=None):
+    """The training plan from a CSV, sorted by date.
+
+    Needs `date`, `session` and `type`. Optional: `distance_km`, `surface` (road, mixed or
+    trail; anything else is dropped), `elevation_m`. `type` is lower-cased. The state is
+    "empty" when no session falls in the current Monday-to-Sunday week, so a plan that has
+    run out is flagged instead of shown as if current."""
     name, path = "plan", cfg.plan_csv
     if path is None:
         return _off(name)
@@ -146,6 +160,12 @@ def read_plan(cfg: Config, today=None):
 
 
 def read_races(cfg: Config):
+    """The race log from a CSV whose headers you map in `race_log_columns`.
+
+    The result uses the field names (the keys of the mapping), not your headers. `name`
+    and `date` are required; dates are parsed with `race_log_date_format`, and rows that do
+    not parse are dropped. `rank_pct` may carry a trailing %, `official_time` is H:MM:SS
+    and becomes `official_time_s` (seconds)."""
     name, path = "race_log", cfg.race_log_csv
     if path is None:
         return _off(name)
@@ -181,6 +201,11 @@ def read_races(cfg: Config):
 
 
 def read_garmin_activities(cfg: Config, now: float | None = None):
+    """Per-activity Garmin data from a CSV or Parquet file, sorted by `start`.
+
+    `start` must be the local wall-clock start time without a timezone, as Strava records
+    it; a file with timezone-aware times is rejected, because the join to Strava would be
+    off by the UTC offset. Other columns are GARMIN_COLUMNS, all optional."""
     name, path = "garmin_activities", cfg.garmin_activities
     if path is None:
         return _off(name)
@@ -214,6 +239,8 @@ def read_garmin_activities(cfg: Config, now: float | None = None):
 
 
 def input_states(cfg: Config, today=None, now: float | None = None) -> dict[str, InputState]:
+    """State of the database and each optional input, keyed by name. `today` and `now`
+    (epoch seconds) exist so tests can fix the clock."""
     try:
         changed = db_mtime(cfg.strava_db).timestamp()
         age = ((now if now is not None else time.time()) - changed) / 3600
@@ -240,7 +267,13 @@ def input_status(*, cfg: Config | None = None) -> pd.DataFrame:
 
 
 def enrich(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
-    """Add session_type, race_name and (when available) Garmin columns to activities."""
+    """Add session_type, race_name and (when available) Garmin columns to activities.
+
+    session_type comes from the first source that has one: Garmin's session type, the plan's
+    type for that date (rest and strength rows are ignored), then Strava's own workout
+    type (race, long run). Garmin is joined by nearest start time within
+    `garmin_join_tolerance_s`, because the two services share no activity id. A race-log
+    entry marks the run on its date whose distance is within 20 % of the logged one."""
     df = df.reset_index(drop=True).copy()
     df["session_type"] = None
     df["race_name"] = None

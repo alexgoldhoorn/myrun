@@ -46,7 +46,20 @@ _NUMERIC = ("distance_m", "elevation_m", "speed_kmh", "avg_hr", "max_hr", "caden
 
 
 def activities(sports=None, since=None, *, cfg: Config | None = None) -> pd.DataFrame:
-    """One row per activity of any sport, oldest first."""
+    """One row per activity of any sport, oldest first.
+
+    `sports` is a list of Strava sport types to keep (`["Run", "Ride"]`); `since` is a date
+    or date string. Activities marked for deletion in statistics-for-strava are left out.
+
+    Columns: activity_id, start, date, hour (decimal), year, sport, name, distance_km,
+    duration_min (moving time), pace_min_km, speed_kmh, elevation_m, hilliness_m_km, avg_hr,
+    max_hr, cadence_spm, relative_effort (Strava's suffer score, NaN when absent), temp_c,
+    feels_like_c, humidity_pct, dew_point_c, device, has_streams, workout_type (Strava's
+    own, e.g. race or longRun), surface (road, trail or mixed, None for other sports),
+    session_type (easy, tempo, ..., race; None when unknown) and race_name. When the Garmin
+    input is set, its columns are added too.
+
+    Cadence is doubled for Run, TrailRun, Walk and Hike because Strava stores one leg."""
     cfg = cfg or load_config()
     with closing(open_db(cfg)) as conn:
         df = pd.read_sql_query(_SQL, conn)
@@ -81,5 +94,5 @@ def activities(sports=None, since=None, *, cfg: Config | None = None) -> pd.Data
 
 
 def runs(since=None, *, cfg: Config | None = None) -> pd.DataFrame:
-    """activities() restricted to running sports."""
+    """activities() restricted to running sports (Strava `Run` and `TrailRun`)."""
     return activities(RUN_SPORTS, since, cfg=cfg)
