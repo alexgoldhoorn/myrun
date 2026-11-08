@@ -420,7 +420,7 @@ requires-dist = [
     { name = "plotly", specifier = ">=5.24" },
     { name = "pyarrow", specifier = ">=17" },
     { name = "pyyaml", specifier = ">=6" },
-    { name = "streamlit", specifier = ">=1.40" },
+    { name = "streamlit", specifier = ">=1.48" },
     { name = "zstandard", specifier = ">=0.23" },
 ]
 
