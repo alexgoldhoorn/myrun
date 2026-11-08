@@ -73,3 +73,21 @@ def test_a_refreshing_warm_up_recomputes_the_timed_results_and_only_those(cfg, m
     assert computed == []                                    # a plain warm-up: all hits
     warm.warm(cfg, refresh=True)
     assert sorted(computed) == sorted(common.CLOCKED)
+
+
+def test_a_database_without_the_device_column_still_works(cfg, tmp_path):
+    import shutil
+    import sqlite3
+
+    from myrun.activities import activities
+
+    db = tmp_path / "nodevice.db"
+    shutil.copy(cfg.strava_db, db)
+    conn = sqlite3.connect(db)
+    conn.execute("ALTER TABLE Activity DROP COLUMN deviceName")
+    conn.commit()
+    conn.close()
+    c = replace(cfg, strava_db=db, cache_dir=tmp_path / "cache2")
+    acts = activities(cfg=c)
+    assert len(acts) and acts["device"].isna().all()
+    assert warm.warm(c)["failed"] == []

@@ -27,7 +27,7 @@ SELECT activityId AS activity_id,
        averageCadence AS cadence,
        movingTimeInSeconds AS moving_s,
        workoutType AS workout_type,
-       deviceName AS device,
+       {device} AS device,
        COALESCE(streamsAreImported, 0) AS has_streams,
        CASE WHEN json_valid(data) THEN json_extract(data, '$.suffer_score') END AS relative_effort,
        CASE WHEN json_valid(weather) THEN json_extract(weather, '$.temperature_2m') END AS temp_c,
@@ -62,7 +62,9 @@ def activities(sports=None, since=None, *, cfg: Config | None = None) -> pd.Data
     Cadence is doubled for Run, TrailRun, Walk and Hike because Strava stores one leg."""
     cfg = cfg or load_config()
     with closing(open_db(cfg)) as conn:
-        df = pd.read_sql_query(_SQL, conn)
+        has_device = any(r[1] == "deviceName" for r in conn.execute("PRAGMA table_info(Activity)"))
+        # deviceName is optional: older statistics-for-strava databases do not have it
+        df = pd.read_sql_query(_SQL.format(device="deviceName" if has_device else "NULL"), conn)
 
     for column in _NUMERIC:
         df[column] = pd.to_numeric(df[column], errors="coerce").astype("float64")
