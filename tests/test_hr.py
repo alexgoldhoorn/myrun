@@ -59,3 +59,27 @@ def test_no_heart_rate_data_gives_no_zones(tmp_path):
     assert settings.zone_upper_bounds is None and settings.easy_band is None
     assert "no heart-rate data" in settings.source
     assert activities(cfg=cfg).empty
+
+
+def test_a_spike_among_few_runs_does_not_lift_the_maximum():
+    days = pd.date_range("2026-06-01", periods=100)
+    acts = pd.DataFrame({"date": days, "sport": "Run", "max_hr": [185.0] * 99 + [230.0]})
+    assert hr.observed_max_hr(acts, today="2026-10-28") == 185
+
+
+def test_a_genuine_peak_close_to_the_rest_is_kept():
+    days = pd.date_range("2026-06-01", periods=50)
+    acts = pd.DataFrame({"date": days, "sport": "Run", "max_hr": [180.0] * 49 + [190.0]})
+    assert hr.observed_max_hr(acts, today="2026-10-28") == 190
+
+
+def test_the_source_text_names_the_pool_actually_used():
+    acts = pd.DataFrame({"date": pd.to_datetime(["2020-01-01"] * 6 + ["2026-09-01"]),
+                         "sport": "Run", "max_hr": [190.0] * 6 + [150.0]})
+    cfg = Config(strava_db="x.db")
+    thin = hr.hr_settings(cfg, acts, today="2026-10-01")
+    assert "all runs" in thin.source and "12 months" not in thin.source
+    days = pd.date_range("2026-06-01", periods=10)
+    full = hr.hr_settings(cfg, pd.DataFrame({"date": days, "sport": "Run", "max_hr": 170.0}),
+                          today="2026-10-28")
+    assert "last 12 months" in full.source

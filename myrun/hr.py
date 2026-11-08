@@ -24,7 +24,14 @@ from myrun.config import RUN_SPORTS, Config
 ZONE_FRACTIONS = (0.60, 0.70, 0.80, 0.90)   # upper edge of zones 1 to 4, as a share of max HR
 EASY_FRACTIONS = (0.65, 0.80)               # the easy band, as a share of max HR
 OBSERVED_DAYS = 365                         # max HR is looked for in the runs of the last year
-OBSERVED_QUANTILE = 0.995                   # ignores the odd sensor spike
+# A run's max HR counts as a sensor spike when it is more than this far above the 90th
+# percentile of all run maxima. Chosen (by Claude, 2026-11): a real all-out effort stays within
+# a few percent of the p90 of one's run maxima, an optical-sensor glitch (230 on a 185 runner)
+# is 20 % or more above it. Unlike a high quantile, the rule does not depend on the number of
+# runs, so one spike cannot lift the maximum (and with it every zone and the easy band) when
+# there are only a few hundred runs. On clean data the result is simply the highest run max.
+SPIKE_REFERENCE_QUANTILE = 0.90
+SPIKE_MARGIN = 1.10
 MIN_OBSERVED_RUNS = 5                       # fewer runs with heart rate give no max HR
 
 
@@ -36,17 +43,29 @@ class HrSettings:
     source: str                              # one line, shown on the pages
 
 
-def observed_max_hr(activities: pd.DataFrame, today=None) -> int | None:
-    """Highest heart rate reached in runs of the last 12 months, spikes excluded."""
+def _observed(activities: pd.DataFrame, today=None) -> tuple[int | None, str]:
+    """The observed maximum and the pool it came from ("runs of the last 12 months" or
+    "all runs" when the last year holds fewer than MIN_OBSERVED_RUNS)."""
     if activities.empty:
-        return None
+        return None, ""
     runs = activities[activities["sport"].isin(RUN_SPORTS)].dropna(subset=["max_hr"])
     now = pd.Timestamp(today if today is not None else date.today()).normalize()
     recent = runs[runs["date"] > now - pd.Timedelta(days=OBSERVED_DAYS)]
-    pool = recent if len(recent) >= MIN_OBSERVED_RUNS else runs
+    if len(recent) >= MIN_OBSERVED_RUNS:
+        pool, label = recent, "runs of the last 12 months"
+    else:
+        pool, label = runs, "all runs"
     if pool.empty:
-        return None
-    return int(round(pool["max_hr"].quantile(OBSERVED_QUANTILE)))
+        return None, ""
+    values = pool["max_hr"].astype(float)
+    ceiling = values.quantile(SPIKE_REFERENCE_QUANTILE) * SPIKE_MARGIN
+    return int(round(values[values <= ceiling].max())), label
+
+
+def observed_max_hr(activities: pd.DataFrame, today=None) -> int | None:
+    """Highest heart rate reached in runs of the last 12 months (all runs when too few),
+    sensor spikes excluded."""
+    return _observed(activities, today)[0]
 
 
 def hr_settings(cfg: Config, activities: pd.DataFrame | None = None, today=None) -> HrSettings:
@@ -61,7 +80,8 @@ def hr_settings(cfg: Config, activities: pd.DataFrame | None = None, today=None)
             from myrun.activities import activities as load  # avoids an import cycle
 
             activities = load(cfg=cfg)
-        max_hr, origin = observed_max_hr(activities, today), "observed in runs of the last 12 months"
+        max_hr, pool = _observed(activities, today)
+        origin = f"observed in {pool}"
     if max_hr is None:
         return HrSettings(None, tuple(zones) if zones else None, tuple(easy) if easy else None,
                           "unavailable: no heart-rate data and nothing set in the config")
