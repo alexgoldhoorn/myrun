@@ -506,3 +506,12 @@ def test_a_day_with_an_activity_of_unknown_length_is_not_a_rest_day():
     days = metrics.training_days(1, activities=acts, today=TODAY).set_index("date")
     assert days.loc[NOW, "activities"] == 1 and days.loc[NOW, "minutes"] == 0.0
     assert days.loc[NOW + pd.Timedelta(days=1), "activities"] == 0
+
+
+def test_the_card_builders_are_still_reachable_from_metrics():
+    from myrun import headline_cards
+
+    for name in ("headline", "adherence_card", "easy_pace_card", "streak_card", "STREAK_RUNS"):
+        assert getattr(metrics, name) is getattr(headline_cards, name)
+    with pytest.raises(AttributeError):
+        metrics.no_such_name

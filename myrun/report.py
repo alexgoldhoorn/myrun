@@ -16,10 +16,11 @@ from myrun import bands
 from myrun.activities import activities as _load
 from myrun.config import RUN_SPORTS, Config, load_config
 from myrun.dates import today_ts
+from myrun.headline_cards import headline
 from myrun.hr import hr_settings
 from myrun.load import load_status
 from myrun.metric import Metric, clean
-from myrun.metrics import (headline, intensity_weekly, race_readiness, vo2max_trend,
+from myrun.metrics import (intensity_weekly, race_readiness, vo2max_trend,
                            weekly_runs)
 from myrun.optional import input_states, read_plan, read_wellness
 from myrun.planmatch import plan_vs_actual

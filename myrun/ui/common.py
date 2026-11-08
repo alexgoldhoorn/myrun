@@ -8,7 +8,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from myrun import bands, dates, dynamics, fmt, links, metrics, optional, streams, trends
+from myrun import bands, dates, dynamics, fmt, headline_cards, links, metrics, optional, streams, trends
 from myrun.activities import activities
 from myrun.config import RUN_SPORTS, Config, ConfigError, load_config
 from myrun.hr import hr_settings
@@ -100,7 +100,7 @@ COMPUTE = {
     "races": lambda cfg: optional.read_races(cfg),
     "races_linked": _races_linked,
     "hr_settings": lambda cfg: hr_settings(cfg, load_activities(cfg)),
-    "headline": lambda cfg: metrics.headline(activities=load_activities(cfg), cfg=cfg),
+    "headline": lambda cfg: headline_cards.headline(activities=load_activities(cfg), cfg=cfg),
     "weekly_load": lambda cfg, weeks: weekly_load(weeks, activities=load_activities(cfg), cfg=cfg),
     "weekly_runs": lambda cfg, weeks: metrics.weekly_runs(weeks, activities=load_activities(cfg),
                                                           cfg=cfg),

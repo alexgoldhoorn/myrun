@@ -6,7 +6,8 @@ from myrun.dynamics import activity_dynamics, dynamics_trend
 from myrun.hr import hr_settings
 from myrun.load import load_status, weekly_load
 from myrun.metric import Metric
-from myrun.metrics import headline, intensity_weekly, vo2max_trend, weekly_runs
+from myrun.headline_cards import headline
+from myrun.metrics import intensity_weekly, vo2max_trend, weekly_runs
 from myrun.optional import input_status
 from myrun.planmatch import plan_vs_actual
 from myrun.splits import splits

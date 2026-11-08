@@ -29,3 +29,13 @@ def week_starts(dates: pd.Series) -> pd.Series:
 def week_range(now: pd.Timestamp, weeks: int) -> pd.DatetimeIndex:
     """The Mondays of the `weeks` weeks ending with the week of `now`, oldest first."""
     return pd.date_range(monday_of(now) - pd.Timedelta(weeks=weeks - 1), periods=weeks, freq="7D")
+
+
+def between(df: pd.DataFrame, first: pd.Timestamp, last: pd.Timestamp) -> pd.DataFrame:
+    """Rows whose `date` falls in first..last, both days included."""
+    return df[(df["date"] >= first) & (df["date"] <= last)]
+
+
+def last_days(df: pd.DataFrame, end: pd.Timestamp, days: int = 28) -> pd.DataFrame:
+    """Rows whose `date` falls in the `days` days up to and including `end`."""
+    return df[(df["date"] > end - pd.Timedelta(days=days)) & (df["date"] <= end)]
