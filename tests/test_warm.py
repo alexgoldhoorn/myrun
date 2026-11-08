@@ -91,3 +91,12 @@ def test_a_database_without_the_device_column_still_works(cfg, tmp_path):
     acts = activities(cfg=c)
     assert len(acts) and acts["device"].isna().all()
     assert warm.warm(c)["failed"] == []
+
+
+def test_utc_warning_only_in_a_container_with_tz_unset_and_utc_local_time():
+    w = warm.timezone_warning
+    assert w({}, "UTC", container=True)
+    assert w({"TZ": ""}, "UTC", container=True)
+    assert w({"TZ": "Europe/Amsterdam"}, "UTC", container=True) is None
+    assert w({}, "CET", container=True) is None
+    assert w({}, "UTC", container=False) is None

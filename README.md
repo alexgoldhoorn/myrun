@@ -204,6 +204,7 @@ Environment variables:
 ```bash
 docker build -t myrun .
 docker run -p 8501:8501 \
+  -e TZ=Europe/Amsterdam \
   -v /path/to/statistics-for-strava/storage/database:/data:ro \
   -v /path/to/your/inputs:/inputs:ro \
   -v /path/to/config.yaml:/config/config.yaml:ro \
@@ -223,10 +224,16 @@ services:
       - /path/to/your/inputs:/inputs:ro
       - ./config.yaml:/config/config.yaml:ro
       - myrun-cache:/cache
+    environment:
+      TZ: Europe/Amsterdam
     restart: unless-stopped
 volumes:
   myrun-cache:
 ```
+
+`TZ` must be the timezone your activities were recorded in. Containers default to UTC, so
+without it "today" and the day a late-evening run falls on can be off by a day (the app logs a
+warning at start when it sees this).
 
 Use container paths in that config file: `strava_db: /data/strava.db`, `/inputs/...` for the
 optional inputs, `cache_dir: /cache`. The image runs as UID 1000, so the mounted files must be

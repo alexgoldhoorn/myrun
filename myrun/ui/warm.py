@@ -14,6 +14,7 @@ import logging
 import os
 import sys
 import threading
+import time
 
 from myrun.config import Config, load_config
 from myrun.ui import common
@@ -88,6 +89,20 @@ def _wait_for_server(stop: threading.Event, tries: int = 60) -> None:
 _launching = threading.Event()
 
 
+def timezone_warning(environ, tzname: str, container: bool) -> str | None:
+    """A warning when dates are likely to shift, else None: in a container with TZ unset the
+    clock is UTC, while the activities' times are local."""
+    if container and not environ.get("TZ") and tzname == "UTC":
+        return ("TZ is not set and the container runs in UTC: 'today' and the day an activity "
+                "falls on may be off by a day. Set TZ to the timezone your activities were "
+                "recorded in, e.g. TZ=Europe/Amsterdam.")
+    return None
+
+
+def _in_container() -> bool:
+    return os.path.exists("/.dockerenv") or os.path.exists("/run/.containerenv")
+
+
 def streamlit_argv(argv: list[str]) -> list[str]:
     return ["streamlit", *argv[1:]]
 
@@ -103,6 +118,9 @@ def main() -> None:
         for name in ("myrun.cache", "myrun.warm"):
             logging.getLogger(name).addHandler(handler)
             logging.getLogger(name).setLevel(logging.DEBUG)
+    message = timezone_warning(os.environ, time.tzname[0], _in_container())
+    if message:
+        log.warning(message)
     _launching.set()
     threading.Thread(target=loop, name="myrun-warm", daemon=True).start()
     from streamlit.web.cli import main as streamlit_main
