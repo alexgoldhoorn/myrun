@@ -1,17 +1,16 @@
 """Dashboard: how am I doing right now?"""
 
-import datetime as dt
-
 import pandas as pd
 import streamlit as st
 
-from myrun import fmt, links
+from myrun import dates, fmt, links
+from myrun.metrics import TREND_WEEKS
 from myrun.ui import cards, charts, common
 
 cfg = common.setup("Dashboard")
 acts = common.load_activities(cfg)
 states = common.cached("input_states", cfg)
-today = pd.Timestamp(dt.date.today())
+today = dates.today_ts()
 
 common.banner(states, page="Dashboard")
 st.title("Dashboard")
@@ -44,8 +43,9 @@ st.subheader("Volume")
 cards.card_row(numbers["volume"])
 st.subheader("Consistency")
 cards.card_row(numbers["consistency"])
-st.caption("Training days, last 12 weeks: one column per week, Monday on top; darker is longer.")
-st.markdown(cards.calendar_html(common.cached("training_days", cfg, 12)), unsafe_allow_html=True)
+st.caption(f"Training days, last {TREND_WEEKS} weeks: one column per week, Monday on top; "
+           "darker is longer.")
+st.markdown(cards.calendar_html(common.cached("training_days", cfg, TREND_WEEKS)), unsafe_allow_html=True)
 st.subheader("Load and fitness")
 cards.card_row(numbers["fitness"])
 
@@ -58,20 +58,20 @@ if wellness_state.status != "off":
         st.caption(f"Values for {wellness['date'].iloc[-1]:%a %d %b}.")
 
 # ---- charts ---------------------------------------------------------------
-st.caption("Last 12 weeks, by week.")
+st.caption(f"Last {TREND_WEEKS} weeks, by week.")
 left, middle, right = st.columns(3)
 with left:
     st.subheader("Load")
     st.plotly_chart(common.figure("weekly_load", cfg,
-                                  lambda: charts.load_bars(common.cached("weekly_load", cfg, 12))))
+                                  lambda: charts.load_bars(common.cached("weekly_load", cfg, TREND_WEEKS))))
 with middle:
     st.subheader("Running km")
     st.plotly_chart(common.figure(
-        "weekly_km", cfg, lambda: charts.weekly_km_bars(common.cached("weekly_runs", cfg, 12))))
+        "weekly_km", cfg, lambda: charts.weekly_km_bars(common.cached("weekly_runs", cfg, TREND_WEEKS))))
 with right:
     st.subheader("Easy pace")
     st.plotly_chart(common.figure(
-        "easy_pace", cfg, lambda: charts.easy_pace_line(common.cached("weekly_runs", cfg, 12))))
+        "easy_pace", cfg, lambda: charts.easy_pace_line(common.cached("weekly_runs", cfg, TREND_WEEKS))))
 
 # ---- this week ------------------------------------------------------------
 st.subheader("This week")

@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import datetime as dt
 import logging
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
-from myrun import bands, dynamics, fmt, links, metrics, optional, streams, trends
+from myrun import bands, dates, dynamics, fmt, links, metrics, optional, streams, trends
 from myrun.activities import activities
 from myrun.config import RUN_SPORTS, Config, ConfigError, load_config
 from myrun.hr import hr_settings
@@ -48,7 +47,7 @@ CACHE_ENTRIES = 64         # per cache; stream tables and figures are the large 
 
 
 def _today() -> pd.Timestamp:
-    return pd.Timestamp(dt.date.today())
+    return dates.today_ts()
 
 
 def _key(cfg: Config) -> tuple:
