@@ -82,6 +82,27 @@ def _section(raw: dict, name: str, allowed: set[str], source: Path) -> dict:
     return section
 
 
+def _numbers(value, count: int, what: str, source: Path, *, kind=float,
+             ascending: bool = False) -> tuple:
+    """A list of exactly `count` positive numbers (optionally strictly rising), else ConfigError."""
+    if not isinstance(value, (list, tuple)) or len(value) != count:
+        raise ConfigError(f"{source}: '{what}' must be a list of {count} numbers")
+    out = []
+    for item in value:
+        if isinstance(item, bool) or not isinstance(item, (int, float)) or item <= 0:
+            raise ConfigError(f"{source}: '{what}' must hold positive numbers, got {item!r}")
+        out.append(kind(item))
+    if ascending and any(b <= a for a, b in zip(out, out[1:])):
+        raise ConfigError(f"{source}: '{what}' must be strictly increasing")
+    return tuple(out)
+
+
+def _number(value, what: str, source: Path, *, kind=float) -> float | int:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ConfigError(f"{source}: '{what}' must be a number, got {value!r}")
+    return kind(value)
+
+
 def _sensors(items, source: Path) -> tuple[tuple[date, str], ...]:
     out = []
     for item in items if isinstance(items, list) else [items]:
@@ -148,12 +169,13 @@ def load_config(path: str | Path | None = None) -> Config:
     if links.get("statistics_for_strava_url"):
         kwargs["sfs_url"] = str(links["statistics_for_strava_url"]).rstrip("/")
     if hr.get("max_hr"):
-        kwargs["max_hr"] = int(hr["max_hr"])
+        kwargs["max_hr"] = _number(hr["max_hr"], "hr.max_hr", source, kind=int)
     if hr.get("zone_upper_bounds"):
-        kwargs["hr_zone_upper_bounds"] = tuple(int(v) for v in hr["zone_upper_bounds"])
+        kwargs["hr_zone_upper_bounds"] = _numbers(hr["zone_upper_bounds"], 4, "hr.zone_upper_bounds",
+                                                  source, kind=int, ascending=True)
     if hr.get("easy_band"):
-        low, high = hr["easy_band"]
-        kwargs["easy_hr_band"] = (int(low), int(high))
+        kwargs["easy_hr_band"] = _numbers(hr["easy_band"], 2, "hr.easy_band", source,
+                                          kind=int, ascending=True)
     if hr.get("sensors"):
         kwargs["hr_sensors"] = _sensors(hr["sensors"], source)
     if hr.get("sensors_worn"):
@@ -162,11 +184,13 @@ def load_config(path: str | Path | None = None) -> Config:
         kwargs["hr_sensors_worn"] = hr["sensors_worn"]
     for key in _THRESHOLDS - {"load_bands", "garmin_join_tolerance_s"}:
         if thresholds.get(key) is not None:
-            kwargs[key] = float(thresholds[key])
+            kwargs[key] = _number(thresholds[key], f"thresholds.{key}", source)
     if "load_bands" in thresholds:
-        kwargs["load_bands"] = tuple(float(v) for v in thresholds["load_bands"])
+        kwargs["load_bands"] = _numbers(thresholds["load_bands"], 3, "thresholds.load_bands",
+                                        source, ascending=True)
     if "garmin_join_tolerance_s" in thresholds:
-        kwargs["garmin_join_tolerance_s"] = int(thresholds["garmin_join_tolerance_s"])
+        kwargs["garmin_join_tolerance_s"] = _number(thresholds["garmin_join_tolerance_s"],
+                                                    "thresholds.garmin_join_tolerance_s", source, kind=int)
     if raw.get("devices"):
         kwargs["device_owned_from"] = _devices(raw["devices"], source)
     return Config(**kwargs)

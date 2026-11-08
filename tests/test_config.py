@@ -129,3 +129,30 @@ def test_devices_owned_from(tmp_path):
     assert cfg.device_owned_from == {"Garmin Forerunner 965": date(2024, 7, 25)}
     with pytest.raises(ConfigError):
         load_config(_write(tmp_path, "strava_db: /d.db\ndevices: [{name: x}]\n"))
+
+
+@pytest.mark.parametrize("body", [
+    "hr: {easy_band: [120, 140, 150]}",
+    "hr: {easy_band: [150, 120]}",
+    "hr: {max_hr: abc}",
+    "hr: {zone_upper_bounds: [150, 140, 160, 170]}",
+    "hr: {zone_upper_bounds: [100, 120, 140]}",
+    "hr: {zone_upper_bounds: [a, 120, 140, 150]}",
+    "thresholds: {load_bands: [0.8, 1.3]}",
+    "thresholds: {load_bands: [0.8, 1.5, 1.3]}",
+    "thresholds: {stale_hours: soon}",
+    "thresholds: {garmin_join_tolerance_s: x}",
+])
+def test_bad_values_are_config_errors_not_tracebacks(tmp_path, body):
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, f"strava_db: /d.db\n{body}\n"))
+
+
+def test_valid_hr_and_threshold_values_still_load(tmp_path):
+    cfg = load_config(_write(tmp_path, """
+strava_db: /d.db
+hr: {max_hr: 180, zone_upper_bounds: [125, 145, 160, 172], easy_band: [125, 148]}
+thresholds: {load_bands: [0.7, 1.2, 1.6], stale_hours: 24}
+"""))
+    assert cfg.hr_zone_upper_bounds == (125, 145, 160, 172) and cfg.easy_hr_band == (125, 148)
+    assert cfg.load_bands == (0.7, 1.2, 1.6) and cfg.stale_hours == 24.0
