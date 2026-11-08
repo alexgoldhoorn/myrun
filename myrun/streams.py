@@ -20,6 +20,12 @@ _STREAMS = {"time": "time_s", "distance": "distance_m", "heartrate": "hr",
             "velocity_smooth": "speed_ms", "altitude": "altitude_m", "cadence": "cadence_spm",
             "grade_smooth": "grade_pct", "moving": "moving"}
 
+# Chosen (by Claude): 0.5 m/s (1.8 km/h) is slower than any walk, so slower samples are standing
+# still (GPS jitter), not running; their pace would be meaningless.
+MIN_SPEED_MS = 0.5
+# Chosen (by Claude): drift compares two halves; under 30 minutes the halves are too short
+# for a heartbeat trend to rise above noise (warm-up and pace changes dominate).
+MIN_DRIFT_MINUTES = 30
 MAX_SAMPLE_GAP_S = 10  # a longer gap between samples is a pause, not time in a zone
 
 
@@ -55,7 +61,7 @@ def activity_streams(activity_id: str, *, cfg: Config | None = None) -> pd.DataF
         df["cadence_spm"] = df["cadence_spm"] * 2
     if "speed_ms" in df:
         speed = df["speed_ms"].astype(float)
-        df["pace_min_km"] = (1000 / speed.where(speed >= 0.5) / 60)
+        df["pace_min_km"] = (1000 / speed.where(speed >= MIN_SPEED_MS) / 60)
     return df.reindex(columns=COLUMNS)
 
 
@@ -83,7 +89,7 @@ def zone_seconds(streams_df: pd.DataFrame, upper_bounds: Sequence[int]) -> pd.Da
     return zones
 
 
-def drift_pct(streams_df: pd.DataFrame, min_minutes: float = 30) -> float | None:
+def drift_pct(streams_df: pd.DataFrame, min_minutes: float = MIN_DRIFT_MINUTES) -> float | None:
     """Change in speed-per-heartbeat from the first to the second half, in percent.
 
     Positive means the second half cost more heartbeats for the same speed.

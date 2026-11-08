@@ -40,6 +40,12 @@ MAX_LAP_CV = 0.15              # chosen, from the lap data: core lap speeds of w
                                # are under 0.144, half of long runs under 0.131)
 TRAIL_FALLBACK_M_PER_KM = 30.0  # chosen default; fitted from the data by trail_threshold() when it can
 MIN_TRAIL_FIT_RUNS = 20        # chosen: TrailRun-tagged runs needed to fit the trail threshold
+# Search range (m of climb per km) for the fitted trail threshold. Chosen (by Claude): below
+# 10 m/km a run is flat whatever the surface; above 60 m/km nothing but a mountain run fits.
+TRAIL_SEARCH_M_PER_KM = (10.0, 60.0)
+# Fewest core laps for a lap-speed spread (CV) to mean anything. Chosen (by Claude): the
+# spread of one or two values says nothing about intervals versus steady running.
+MIN_CV_LAPS = 3
 SURFACES = ("road", "trail")
 
 _LAPS_SQL = """
@@ -96,7 +102,7 @@ def trail_threshold(runs: pd.DataFrame) -> tuple[float, str]:
     road = pool.loc[pool["sport"] == "Run", "hilliness_m_km"].to_numpy()
     if len(trail) < MIN_TRAIL_FIT_RUNS or len(road) < MIN_TRAIL_FIT_RUNS:
         return TRAIL_FALLBACK_M_PER_KM, "chosen default (too few tagged trail runs to fit)"
-    candidates = np.arange(10.0, 61.0)
+    candidates = np.arange(TRAIL_SEARCH_M_PER_KM[0], TRAIL_SEARCH_M_PER_KM[1] + 1)
     errors = [(road >= t).mean() + (trail < t).mean() for t in candidates]
     best = float(candidates[int(np.argmin(errors))])
     return best, f"fitted on {len(trail)} TrailRun and {len(road)} Run activities"
@@ -145,7 +151,7 @@ def core_stats(laps: pd.DataFrame, splits: pd.DataFrame) -> pd.DataFrame:
           / with_hr.groupby("activity_id")["duration_s"].sum())
 
     def _cv(group: pd.DataFrame) -> float:
-        if len(group) < 3:
+        if len(group) < MIN_CV_LAPS:
             return float("nan")
         weights = group["duration_s"]
         mean = np.average(group["speed"], weights=weights)

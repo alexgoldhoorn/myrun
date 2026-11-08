@@ -26,6 +26,10 @@ GARMIN_NUMERIC = ("ground_contact_ms", "vertical_oscillation_cm", "vertical_rati
                   "anaerobic_te", "garmin_load", "vo2max")
 GARMIN_COLUMNS = ("garmin_activity_id", "session_name", "session_type", *GARMIN_NUMERIC)
 RACE_TEXT = ("name", "place", "type", "garmin_url", "strava_url", "diploma_url")
+# Chosen (by Claude): a race-log entry marks the run on its date whose distance is within
+# 20 % of the logged one; wider than watch-vs-official course differences (a few percent)
+# and than a warm-up added to the recorded activity, narrow enough not to mark a shake-out run.
+RACE_MATCH_TOLERANCE = 0.2
 NON_RUN_PLAN_TYPES = ("rest", "strength")
 SURFACES = ("road", "mixed", "trail")
 _WORKOUT_TYPES = {"race": "race", "longRun": "long"}
@@ -315,7 +319,7 @@ def enrich(df: pd.DataFrame, cfg: Config) -> pd.DataFrame:
                 continue
             gap = (candidates["distance_km"] - race.distance_km).abs()
             best = gap.idxmin()
-            if gap[best] > 0.2 * race.distance_km:
+            if gap[best] > RACE_MATCH_TOLERANCE * race.distance_km:
                 continue
             df.loc[best, "race_name"] = race.name
             df.loc[best, "session_type"] = "race"
