@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import date
-
 import numpy as np
 import pandas as pd
 
 from myrun.activities import activities as _load
 from myrun.config import RUN_SPORTS, Config, load_config
+from myrun.dates import monday_of, today_ts, week_range, week_starts
 from myrun.load import load_status
 from myrun.metric import Metric, clean
 from myrun.optional import NON_RUN_PLAN_TYPES, read_plan, read_wellness
@@ -51,10 +50,6 @@ ROAD_RACE_CLIMB_M = 100.0      # confirmed: ... and within 100 m of climb, when 
 TRAIL_RACE_SHARE = 0.25        # confirmed (10-25 %): trail, within 25 % of distance and of climb when known
 
 
-def _now(today) -> pd.Timestamp:
-    return pd.Timestamp(today if today is not None else date.today()).normalize()
-
-
 def _between(df: pd.DataFrame, first: pd.Timestamp, last: pd.Timestamp) -> pd.DataFrame:
     return df[(df["date"] >= first) & (df["date"] <= last)]
 
@@ -81,12 +76,11 @@ def weekly_runs(weeks: int = TREND_WEEKS, *, activities: pd.DataFrame | None = N
     without one). Weeks without runs are present with zeros."""
     cfg = cfg or load_config()
     acts = activities if activities is not None else _load(cfg=cfg)
-    now = _now(today)
-    monday = now - pd.Timedelta(days=now.weekday())
-    all_weeks = pd.date_range(monday - pd.Timedelta(weeks=weeks - 1), periods=weeks, freq="7D")
+    now = today_ts(today)
+    all_weeks = week_range(now, weeks)
     runs = acts[acts["sport"].isin(RUN_SPORTS)]
     runs = _between(runs, all_weeks[0], now).copy()
-    runs["week_start"] = runs["date"] - pd.to_timedelta(runs["date"].dt.weekday, unit="D")
+    runs["week_start"] = week_starts(runs["date"])
     out = runs.groupby("week_start").agg(
         run_km=("distance_km", "sum"), elevation_m=("elevation_m", "sum"),
         longest_km=("distance_km", "max"), n_runs=("activity_id", "count"),
@@ -96,7 +90,7 @@ def weekly_runs(weeks: int = TREND_WEEKS, *, activities: pd.DataFrame | None = N
 
     easy = easy_runs(acts, cfg)
     easy = _between(easy, all_weeks[0], now).copy()
-    easy["week_start"] = easy["date"] - pd.to_timedelta(easy["date"].dt.weekday, unit="D")
+    easy["week_start"] = week_starts(easy["date"])
     out["easy_pace_min_km"] = out["week_start"].map(
         easy.groupby("week_start")["pace_min_km"].median()).astype("float64")
 
@@ -104,8 +98,7 @@ def weekly_runs(weeks: int = TREND_WEEKS, *, activities: pd.DataFrame | None = N
     out["planned_km"] = float("nan")
     if plan is not None:
         runs_planned = plan[~plan["type"].isin(NON_RUN_PLAN_TYPES)].copy()
-        runs_planned["week_start"] = (runs_planned["date"]
-                                      - pd.to_timedelta(runs_planned["date"].dt.weekday, unit="D"))
+        runs_planned["week_start"] = week_starts(runs_planned["date"])
         per_week = runs_planned.groupby("week_start")["distance_km"].sum(min_count=1)
         out["planned_km"] = out["week_start"].map(per_week).astype("float64")
     return out
@@ -177,16 +170,15 @@ def intensity_weekly(weeks: int = TREND_WEEKS, *, activities: pd.DataFrame | Non
                      today=None, cfg: Config | None = None) -> pd.DataFrame:
     """Running minutes per week (Monday start) in easy, steady and hard sessions."""
     acts = activities if activities is not None else _load(cfg=cfg or load_config())
-    now = _now(today)
-    monday = now - pd.Timedelta(days=now.weekday())
-    all_weeks = pd.date_range(monday - pd.Timedelta(weeks=weeks - 1), periods=weeks, freq="7D")
+    now = today_ts(today)
+    all_weeks = week_range(now, weeks)
     columns = [f"{kind}_min" for kind in INTENSITIES]
     runs = acts[acts["sport"].isin(RUN_SPORTS)]
     runs = _between(runs, all_weeks[0], now)
     if "aerobic_te" not in runs.columns or runs.empty:
         out = pd.DataFrame(0.0, index=all_weeks, columns=columns)
     else:
-        week = runs["date"] - pd.to_timedelta(runs["date"].dt.weekday, unit="D")
+        week = week_starts(runs["date"])
         rated = runs.assign(week_start=week, kind=intensity(runs)).dropna(subset=["kind"])
         out = (rated.pivot_table(index="week_start", columns="kind", values="duration_min",
                                  aggfunc="sum", fill_value=0.0)
@@ -315,15 +307,11 @@ def easy_pace_card(easy: pd.DataFrame, series: tuple[float, ...], now: pd.Timest
                   note=note, detail=f"{n} run" + ("" if n == 1 else "s"))
 
 
-def _week_start(dates: pd.Series) -> pd.Series:
-    return dates - pd.to_timedelta(dates.dt.weekday, unit="D")
-
-
 def streak_card(runs: pd.DataFrame, now: pd.Timestamp) -> Metric:
     """Weeks in a row with STREAK_RUNS or more runs. The current week counts once it
     qualifies and never breaks the streak before it is over."""
-    monday = now - pd.Timedelta(days=now.weekday())
-    per_week = _week_start(runs.loc[runs["date"] <= now, "date"]).value_counts()
+    monday = monday_of(now)
+    per_week = week_starts(runs.loc[runs["date"] <= now, "date"]).value_counts()
     this_week = int(per_week.get(monday, 0))
     streak, week = (1 if this_week >= STREAK_RUNS else 0), monday - pd.Timedelta(days=7)
     while per_week.get(week, 0) >= STREAK_RUNS:
@@ -341,8 +329,8 @@ def training_days(weeks: int = TREND_WEEKS, *, activities: pd.DataFrame | None =
 
     Days after today are NaN: they have not happened, which is not the same as a rest day."""
     acts = activities if activities is not None else _load(cfg=cfg or load_config())
-    now = _now(today)
-    monday = now - pd.Timedelta(days=now.weekday())
+    now = today_ts(today)
+    monday = monday_of(now)
     dates = pd.date_range(monday - pd.Timedelta(weeks=weeks - 1), periods=7 * weeks, freq="D")
     minutes = acts.groupby("date")["duration_min"].sum().reindex(dates, fill_value=0.0)
     minutes[minutes.index > now] = float("nan")
@@ -412,7 +400,7 @@ def race_readiness(runs: pd.DataFrame, plan: pd.DataFrame | None, now: pd.Timest
 
 
 def _volume(runs: pd.DataFrame, weekly: pd.DataFrame, now: pd.Timestamp) -> list[Metric]:
-    monday = now - pd.Timedelta(days=now.weekday())
+    monday = monday_of(now)
     week = float(_between(runs, monday, now)["distance_km"].sum())
     week_before = float(_between(runs, monday - pd.Timedelta(days=7),
                                  now - pd.Timedelta(days=7))["distance_km"].sum())
@@ -525,7 +513,7 @@ def headline(*, activities: pd.DataFrame | None = None, today=None, cfg: Config 
     wellness file is stale (both only differ from the real ones in tests)."""
     cfg = cfg or load_config()
     acts = activities if activities is not None else _load(cfg=cfg)
-    day = _now(today)
+    day = today_ts(today)
     runs = acts[acts["sport"].isin(RUN_SPORTS)]
     weekly = weekly_runs(TREND_WEEKS, activities=acts, today=day, cfg=cfg)
     adherence = adherence_card(runs, read_plan(cfg, today=day)[0], day)

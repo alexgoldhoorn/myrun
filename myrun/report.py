@@ -9,13 +9,13 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import date
 
 import pandas as pd
 
 from myrun import bands
 from myrun.activities import activities as _load
 from myrun.config import RUN_SPORTS, Config, load_config
+from myrun.dates import today_ts
 from myrun.hr import hr_settings
 from myrun.load import load_status
 from myrun.metric import Metric, clean
@@ -85,7 +85,7 @@ def fitness(months: int = DEFAULT_MONTHS, *, cfg: Config | None = None,
     """VO2max, aerobic efficiency (pace against heart rate) and resting HR / HRV by month."""
     cfg = cfg or load_config()
     acts = activities if activities is not None else _load(cfg=cfg)
-    now = pd.Timestamp(today if today is not None else date.today()).normalize()
+    now = today_ts(today)
     first = (now - pd.DateOffset(months=months - 1)).to_period("M").start_time
     out = [f"FITNESS TREND, monthly, {first:%Y-%m} to {now:%Y-%m}"]
 
@@ -152,7 +152,7 @@ def fitness_by_band(months: int = DEFAULT_MONTHS, *, first_year: int | None = No
     aerobic efficiency per year, and the easy/steady/hard mix per year."""
     cfg = cfg or load_config()
     acts = activities if activities is not None else _load(cfg=cfg)
-    now = pd.Timestamp(today if today is not None else date.today()).normalize()
+    now = today_ts(today)
     first_year = first_year if first_year is not None else bands.default_first_year(now)
     runs = bands.band_runs(activities=acts, cfg=cfg, today=now)
     heart = hr_settings(cfg, acts, now)
@@ -254,7 +254,7 @@ def race(weeks: int = DEFAULT_WEEKS, *, cfg: Config | None = None,
     """The build-up to the next race against the last similar one, plus the weeks behind it."""
     cfg = cfg or load_config()
     acts = activities if activities is not None else _load(cfg=cfg)
-    now = pd.Timestamp(today if today is not None else date.today()).normalize()
+    now = today_ts(today)
     runs = acts[acts["sport"].isin(RUN_SPORTS)]
     plan, plan_state = read_plan(cfg, today=now)
     out = ["RACE PROGRESS"]

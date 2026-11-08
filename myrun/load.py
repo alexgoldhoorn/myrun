@@ -2,17 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import date
-
 import pandas as pd
 
 from myrun import derive
 from myrun.activities import activities as _load
 from myrun.config import Config, load_config
-
-
-def _today(today) -> pd.Timestamp:
-    return pd.Timestamp(today if today is not None else date.today()).normalize()
+from myrun.dates import today_ts, week_range, week_starts
 
 
 def weekly_load(weeks: int = 12, *, activities: pd.DataFrame | None = None, today=None,
@@ -20,11 +15,10 @@ def weekly_load(weeks: int = 12, *, activities: pd.DataFrame | None = None, toda
     """Relative effort per week (Monday start), oldest first, the current week last."""
     cfg = cfg or load_config()
     acts = activities if activities is not None else _load(cfg=cfg)
-    now = _today(today)
-    this_monday = now - pd.Timedelta(days=now.weekday())
-    all_weeks = pd.date_range(this_monday - pd.Timedelta(weeks=weeks - 1), periods=weeks, freq="7D")
+    now = today_ts(today)
+    all_weeks = week_range(now, weeks)
     df = acts[(acts["date"] >= all_weeks[0]) & (acts["date"] <= now)].copy()
-    df["week_start"] = df["date"] - pd.to_timedelta(df["date"].dt.weekday, unit="D")
+    df["week_start"] = week_starts(df["date"])
     df["missing"] = df["relative_effort"].isna()
     grouped = df.groupby("week_start").agg(
         effort=("relative_effort", "sum"),
@@ -42,7 +36,7 @@ def load_status(*, activities: pd.DataFrame | None = None, today=None,
     `column` is the per-activity load: Strava's relative effort, or `garmin_load`."""
     cfg = cfg or load_config()
     acts = activities if activities is not None else _load(cfg=cfg)
-    now = _today(today)
+    now = today_ts(today)
     last28 = acts[(acts["date"] > now - pd.Timedelta(days=28)) & (acts["date"] <= now)]
     last7 = last28[last28["date"] > now - pd.Timedelta(days=7)]
     sum7 = float(last7[column].sum())

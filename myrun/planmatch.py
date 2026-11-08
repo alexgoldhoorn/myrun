@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import date
-
 import pandas as pd
 
 from myrun.activities import activities as _load
 from myrun.config import RUN_SPORTS, Config, load_config
+from myrun.dates import monday_of, today_ts
 from myrun.optional import none_if_missing, read_plan
 
 
@@ -21,9 +20,9 @@ def plan_vs_actual(week_start=None, *, activities: pd.DataFrame | None = None, t
                    cfg: Config | None = None) -> pd.DataFrame:
     """Seven rows, Monday to Sunday. Planned columns are None without a plan input."""
     cfg = cfg or load_config()
-    now = pd.Timestamp(today if today is not None else date.today()).normalize()
+    now = today_ts(today)
     start = (pd.Timestamp(week_start).normalize() if week_start is not None
-             else now - pd.Timedelta(days=now.weekday()))
+             else monday_of(now))
     acts = activities if activities is not None else _load(cfg=cfg)
     plan, _ = read_plan(cfg, today=now)
 

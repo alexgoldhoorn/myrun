@@ -21,6 +21,7 @@ import pandas as pd
 
 from myrun.activities import activities as _load
 from myrun.config import RUN_SPORTS, Config, load_config
+from myrun.dates import today_ts
 from myrun.hr import hr_settings
 from myrun.metrics import INTENSITIES, intensity
 from myrun.stravadb import open_db
@@ -397,4 +398,4 @@ def since_year(frame: pd.DataFrame, first_year: int, column: str = "period") -> 
 
 def default_first_year(today=None) -> int:
     """Five years before this one: how far back the by-band tables start by default."""
-    return pd.Timestamp(today if today is not None else date.today()).year - 5
+    return today_ts(today).year - 5

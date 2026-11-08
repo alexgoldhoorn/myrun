@@ -13,11 +13,11 @@ config when you know them.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
 
 import pandas as pd
 
 from myrun.config import RUN_SPORTS, Config
+from myrun.dates import today_ts
 
 # Used only when the config sets no `hr:` zones. All chosen (the common share-of-max-HR
 # zone model), not fitted to the runner: set `hr:` in the config to overrule them.
@@ -49,7 +49,7 @@ def _observed(activities: pd.DataFrame, today=None) -> tuple[int | None, str]:
     if activities.empty:
         return None, ""
     runs = activities[activities["sport"].isin(RUN_SPORTS)].dropna(subset=["max_hr"])
-    now = pd.Timestamp(today if today is not None else date.today()).normalize()
+    now = today_ts(today)
     recent = runs[runs["date"] > now - pd.Timedelta(days=OBSERVED_DAYS)]
     if len(recent) >= MIN_OBSERVED_RUNS:
         pool, label = recent, "runs of the last 12 months"

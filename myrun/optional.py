@@ -10,12 +10,12 @@ from __future__ import annotations
 import time
 import warnings
 from dataclasses import asdict, dataclass
-from datetime import date
 from pathlib import Path
 
 import pandas as pd
 
 from myrun.config import RUN_SPORTS, Config, load_config
+from myrun.dates import monday_of, today_ts
 from myrun.stravadb import db_mtime
 
 WELLNESS_COLUMNS = ("readiness", "sleep_hours", "hrv_ms", "resting_hr", "body_battery", "stress")
@@ -155,8 +155,7 @@ def read_plan(cfg: Config, today=None):
     df = df[["date", "session", "type", "distance_km", "surface", "elevation_m"]]
     df = df.sort_values("date").reset_index(drop=True)
 
-    now = pd.Timestamp(today if today is not None else date.today()).normalize()
-    monday = now - pd.Timedelta(days=now.weekday())
+    monday = monday_of(today_ts(today))
     in_week = df["date"].between(monday, monday + pd.Timedelta(days=6))
     if not in_week.any():
         return df, InputState(name, "empty", None, "no sessions planned for the current week")
