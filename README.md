@@ -171,7 +171,7 @@ keys are an error, so a typo is reported rather than ignored. Only `strava_db` i
 | `race_log_columns`, `race_log_date_format` | see above | race log header mapping and date format (`%d/%m/%Y`) |
 | `wellness_columns` | none | map your wellness headers to myrun's field names |
 | `links.statistics_for_strava_url` | unset | base URL of your statistics-for-strava site, to link activities |
-| `hr.max_hr` | observed | maximum heart rate; default is taken from your runs of the last 12 months |
+| `hr.max_hr` | observed | maximum heart rate; default is the highest run max of the last 12 months (all runs if fewer than 5), ignoring spikes more than 10 % above the 90th percentile of run maxima |
 | `hr.zone_upper_bounds` | 60/70/80/90 % of max | four upper bpm limits of zones 1 to 4 |
 | `hr.easy_band` | 65 to 80 % of max | `[low, high]` average bpm that counts as an easy run |
 | `hr.sensors`, `hr.sensors_worn` | none, `all` | heart-rate straps by start date, so a change shows in the by-band report; `hard` means worn on hard runs only |
@@ -182,6 +182,10 @@ keys are an error, so a typo is reported rather than ignored. Only `strava_db` i
 | `thresholds.stale_hours` | 36 | age after which an input is marked stale |
 | `thresholds.garmin_join_tolerance_s` | 120 | start-time tolerance of the Garmin join |
 | `devices` | none | second-hand watches, see below |
+
+A bad value (zones that are not four rising numbers, an `easy_band` that is not two, `load_bands`
+that are not three rising numbers, a non-numeric `max_hr` or threshold) stops the app with a
+one-line config error naming the key.
 
 `devices` is for a watch bought second hand: activities recorded on it before you owned it
 sync into your account when you pair it and would count as yours.
