@@ -126,8 +126,10 @@ COMPUTE = {
     "activity_dynamics": _activity_dynamics,
     "band_runs": lambda cfg: bands.band_runs(activities=load_activities(cfg), cfg=cfg),
     "band_table": lambda cfg, by, season: bands.band_table(cached("band_runs", cfg), by, season),
+    # offsets from the cached band analysis, so a season change does not rerun it
     "efficiency_yearly": lambda cfg, season: bands.yearly_efficiency(
-        activities=load_activities(cfg), cfg=cfg, season=season),
+        activities=load_activities(cfg), cfg=cfg, season=season,
+        offsets=bands.watch_offsets(cached("band_runs", cfg))),
     "intensity_yearly": lambda cfg, season: bands.intensity_yearly(
         activities=load_activities(cfg), cfg=cfg, season=season),
 }

@@ -137,3 +137,15 @@ def test_the_race_table_gets_its_garmin_links_from_the_cache(cfg, tmp_path):
     expected = links.fill_race_garmin_urls(optional.read_races(c)[0], common.load_activities(c))
     pd.testing.assert_frame_equal(linked, expected)
     assert common.cached("races_linked", cfg) is None          # no race log configured
+
+
+def test_a_season_change_reuses_the_cached_band_analysis(cfg, monkeypatch):
+    from myrun import bands
+
+    runs = []
+    real = bands.band_runs
+    monkeypatch.setattr(bands, "band_runs", lambda **kw: runs.append(1) or real(**kw))
+    common.cached("efficiency_yearly", cfg, None)
+    first = len(runs)
+    common.cached("efficiency_yearly", cfg, (6, 7, 8))
+    assert len(runs) == first
