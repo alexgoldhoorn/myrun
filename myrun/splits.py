@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import logging
 import os
+import tempfile
 from collections.abc import Sequence
 from contextlib import closing
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -70,9 +72,16 @@ def _write_cache(cfg: Config, cache: pd.DataFrame) -> None:
     path = cfg.cache_dir / CACHE_NAME
     try:
         cfg.cache_dir.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".tmp")
-        cache.to_parquet(tmp, index=False)
-        os.replace(tmp, path)
+        # a unique temp file in the same directory: two processes sharing the cache dir
+        # (app and report CLI) never write the same file, and the replace stays atomic
+        fd, tmp = tempfile.mkstemp(dir=cfg.cache_dir, prefix=path.stem + ".", suffix=".tmp")
+        os.close(fd)
+        try:
+            cache.to_parquet(tmp, index=False)
+            os.replace(tmp, path)
+        except BaseException:
+            Path(tmp).unlink(missing_ok=True)
+            raise
     except OSError as exc:
         log.warning("split cache not written (%s); it will be recomputed next time", exc)
 

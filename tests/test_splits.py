@@ -70,3 +70,21 @@ def test_unwritable_cache_dir_still_returns_rows(cfg):
         assert df.loc[7, "avg_hr"] == pytest.approx(147.0)
     finally:
         cfg.cache_dir.chmod(0o700)
+
+
+def test_cache_writes_use_unique_temp_files_and_leave_none_behind(cfg, monkeypatch):
+    import pandas as pd
+
+    import importlib
+
+    splits = importlib.import_module("myrun.splits")
+
+    seen = []
+    real = pd.DataFrame.to_parquet
+    monkeypatch.setattr(pd.DataFrame, "to_parquet",
+                        lambda self, path, **kw: (seen.append(str(path)), real(self, path, **kw))[1])
+    frame = pd.DataFrame(columns=splits._CACHE_COLUMNS)
+    splits._write_cache(cfg, frame)
+    splits._write_cache(cfg, frame)
+    assert len(set(seen)) == 2 and all(p.endswith(".tmp") for p in seen)
+    assert sorted(p.name for p in cfg.cache_dir.iterdir()) == [splits.CACHE_NAME]
