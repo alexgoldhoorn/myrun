@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sqlite3
 import tempfile
 from collections.abc import Sequence
 from contextlib import closing
@@ -37,9 +38,21 @@ SELECT s.activityId AS activity_id, s.splitNumber AS split, s.distance AS distan
        s.movingTimeInSeconds AS duration_s, s.elevationDifference AS elev_diff_m,
        s.gapPaceInSecondsPerKm AS gap_s_km
 FROM ActivitySplit s JOIN Activity a ON a.activityId = s.activityId
-WHERE s.unitSystem = 'metric' AND COALESCE(a.markedForDeletion, 0) != 1
+WHERE s.unitSystem = 'metric' AND COALESCE(a.markedForDeletion, 0) != 1{sports}
 ORDER BY s.activityId, s.splitNumber
 """
+_NUMERIC = ("distance_m", "duration_s", "elev_diff_m", "gap_s_km")
+
+
+def read_split_rows(conn: sqlite3.Connection, sports: Sequence[str] | None = None) -> pd.DataFrame:
+    """The metric splits of every activity (or of those of the given sport types), one row
+    each, ordered by activity and split; the numbers as float64. The activity id is left as
+    the database has it."""
+    clause = f" AND a.sportType IN ({','.join('?' for _ in sports)})" if sports else ""
+    rows = pd.read_sql_query(_SQL.format(sports=clause), conn, params=list(sports or ()))
+    for column in _NUMERIC:
+        rows[column] = pd.to_numeric(rows[column], errors="coerce").astype("float64")
+    return rows
 
 
 def split_metrics(streams_df: pd.DataFrame, split_distances_m: Sequence[float]) -> pd.DataFrame:
@@ -120,11 +133,9 @@ def splits(since=None, *, cfg: Config | None = None) -> pd.DataFrame:
     later calls read the Parquet cache in `cfg.cache_dir`."""
     cfg = cfg or load_config()
     with closing(open_db(cfg)) as conn:
-        rows = pd.read_sql_query(_SQL, conn)
+        rows = read_split_rows(conn)
         with_streams = {r[0] for r in conn.execute(
             "SELECT DISTINCT activityId FROM ActivityStream WHERE streamType = 'heartrate'")}
-    for column in ("distance_m", "duration_s", "elev_diff_m", "gap_s_km"):
-        rows[column] = pd.to_numeric(rows[column], errors="coerce").astype("float64")
 
     parents = activities(RUN_SPORTS, since, cfg=cfg)[_PARENT]
     rows = rows[rows["activity_id"].isin(parents["activity_id"])].reset_index(drop=True)

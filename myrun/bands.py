@@ -24,6 +24,7 @@ from myrun.config import RUN_SPORTS, Config, load_config
 from myrun.dates import today_ts
 from myrun.hr import hr_settings
 from myrun.metrics import INTENSITIES, intensity
+from myrun.splits import read_split_rows
 from myrun.stravadb import open_db
 from myrun.trends import MIN_EFFICIENCY_MINUTES, aerobic_efficiency
 
@@ -55,14 +56,6 @@ SELECT l.activityId AS activity_id, l.lapNumber AS lap, l.distance AS distance_m
 FROM ActivityLap l JOIN Activity a ON a.activityId = l.activityId
 WHERE COALESCE(a.markedForDeletion, 0) != 1 AND a.sportType IN ({sports})
 ORDER BY l.activityId, l.lapNumber
-"""
-_SPLITS_SQL = """
-SELECT s.activityId AS activity_id, s.splitNumber AS split, s.distance AS distance_m,
-       s.movingTimeInSeconds AS duration_s, s.gapPaceInSecondsPerKm AS gap_s_km
-FROM ActivitySplit s JOIN Activity a ON a.activityId = s.activityId
-WHERE s.unitSystem = 'metric' AND COALESCE(a.markedForDeletion, 0) != 1
-  AND a.sportType IN ({sports})
-ORDER BY s.activityId, s.splitNumber
 """
 
 
@@ -125,10 +118,10 @@ def _read(cfg: Config) -> tuple[pd.DataFrame, pd.DataFrame]:
     marks = ",".join("?" for _ in RUN_SPORTS)
     with closing(open_db(cfg)) as conn:
         laps = pd.read_sql_query(_LAPS_SQL.format(sports=marks), conn, params=list(RUN_SPORTS))
-        splits = pd.read_sql_query(_SPLITS_SQL.format(sports=marks), conn, params=list(RUN_SPORTS))
+        splits = read_split_rows(conn, RUN_SPORTS)
+    for column in laps.columns.drop("activity_id"):
+        laps[column] = pd.to_numeric(laps[column], errors="coerce").astype("float64")
     for frame in (laps, splits):
-        for column in frame.columns.drop("activity_id"):
-            frame[column] = pd.to_numeric(frame[column], errors="coerce").astype("float64")
         frame["activity_id"] = frame["activity_id"].astype(str)
     return laps, splits
 
