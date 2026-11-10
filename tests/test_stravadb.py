@@ -59,3 +59,21 @@ def test_db_mtime_uses_the_wal_when_newer(tmp_path, db_path):
     os.utime(db_path, (1_000_000, 1_000_000))
     os.utime(wal, (2_000_000, 2_000_000))
     assert db_mtime(db_path).timestamp() == 2_000_000
+
+
+def test_dreeve_55_schema_without_streams_column_opens(cfg, db_path):
+    conn = sqlite3.connect(db_path)
+    conn.execute("CREATE TABLE ActivityScan (activityId TEXT, type TEXT, subjectId TEXT)")
+    conn.execute("ALTER TABLE Activity DROP COLUMN streamsAreImported")
+    conn.commit()
+    conn.close()
+    open_db(cfg).close()
+
+
+def test_neither_streams_column_nor_activityscan_is_a_clear_error(db_path):
+    conn = sqlite3.connect(db_path)
+    conn.execute("ALTER TABLE Activity DROP COLUMN streamsAreImported")
+    conn.commit()
+    conn.close()
+    with pytest.raises(StravaDbError, match="ActivityScan"):
+        open_db(Config(strava_db=db_path))

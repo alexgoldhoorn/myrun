@@ -88,3 +88,27 @@ def test_a_second_hand_watch_drops_the_previous_owners_activities(cfg):
     ids = set(activities(cfg=replace(cfg, device_owned_from={"Garmin Forerunner 945": owned}))
               ["activity_id"].astype(str))
     assert str(OLD) not in ids and str(STEADY) in ids
+
+
+def _to_dreeve_55_schema(db_path):
+    """dreeve v5.5.0 replaced Activity.streamsAreImported by ActivityScan rows (type 'streams')."""
+    import sqlite3
+    conn = sqlite3.connect(db_path)
+    conn.execute("CREATE TABLE ActivityScan (activityId VARCHAR(255) NOT NULL, type VARCHAR(255) "
+                 "NOT NULL, subjectId VARCHAR(255) DEFAULT '' NOT NULL, "
+                 "PRIMARY KEY (activityId, type, subjectId))")
+    conn.execute("INSERT INTO ActivityScan (activityId, type) "
+                 "SELECT activityId, 'streams' FROM Activity WHERE streamsAreImported = 1")
+    conn.execute("INSERT INTO ActivityScan (activityId, type) "
+                 "SELECT activityId, 'other' FROM Activity")   # other scan types never count
+    conn.execute("ALTER TABLE Activity DROP COLUMN streamsAreImported")
+    conn.commit()
+    conn.close()
+
+
+def test_has_streams_is_the_same_on_the_dreeve_55_schema(cfg, db_path):
+    before = activities(cfg=cfg).set_index("activity_id")["has_streams"].astype(bool)
+    assert before.any() and not before.all()
+    _to_dreeve_55_schema(db_path)
+    after = activities(cfg=cfg).set_index("activity_id")["has_streams"].astype(bool)
+    pd.testing.assert_series_equal(before, after)

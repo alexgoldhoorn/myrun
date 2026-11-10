@@ -28,7 +28,7 @@ SELECT activityId AS activity_id,
        movingTimeInSeconds AS moving_s,
        workoutType AS workout_type,
        {device} AS device,
-       COALESCE(streamsAreImported, 0) AS has_streams,
+       {has_streams} AS has_streams,
        CASE WHEN json_valid(data) THEN json_extract(data, '$.suffer_score') END AS relative_effort,
        CASE WHEN json_valid(weather) THEN json_extract(weather, '$.temperature_2m') END AS temp_c,
        CASE WHEN json_valid(weather) THEN json_extract(weather, '$.apparent_temperature') END
@@ -40,6 +40,19 @@ FROM Activity
 WHERE COALESCE(markedForDeletion, 0) != 1
 ORDER BY startDateTime
 """
+
+# dreeve v5.5.0 (2026-10) dropped Activity.streamsAreImported: "streams imported" is now an
+# ActivityScan row of type 'streams'. Older databases still have the column.
+_HAS_STREAMS_SCAN = ("EXISTS (SELECT 1 FROM ActivityScan s WHERE s.activityId = Activity.activityId"
+                     " AND s.type = 'streams')")
+
+
+def has_streams_sql(activity_columns: set[str]) -> str:
+    """SQL expression for "this activity's streams are imported", for either schema."""
+    if "streamsAreImported" in activity_columns:
+        return "COALESCE(streamsAreImported, 0)"
+    return _HAS_STREAMS_SCAN
+
 
 _NUMERIC = ("distance_m", "elevation_m", "speed_kmh", "avg_hr", "max_hr", "cadence", "moving_s",
             "relative_effort", "temp_c", "feels_like_c", "humidity_pct", "dew_point_c")
@@ -62,9 +75,10 @@ def activities(sports=None, since=None, *, cfg: Config | None = None) -> pd.Data
     Cadence is doubled for Run, TrailRun, Walk and Hike because Strava stores one leg."""
     cfg = cfg or load_config()
     with closing(open_db(cfg)) as conn:
-        has_device = any(r[1] == "deviceName" for r in conn.execute("PRAGMA table_info(Activity)"))
+        columns = {r[1] for r in conn.execute("PRAGMA table_info(Activity)")}
         # deviceName is optional: older statistics-for-strava databases do not have it
-        df = pd.read_sql_query(_SQL.format(device="deviceName" if has_device else "NULL"), conn)
+        df = pd.read_sql_query(_SQL.format(device="deviceName" if "deviceName" in columns else "NULL",
+                                           has_streams=has_streams_sql(columns)), conn)
 
     for column in _NUMERIC:
         df[column] = pd.to_numeric(df[column], errors="coerce").astype("float64")

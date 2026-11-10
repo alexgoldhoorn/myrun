@@ -18,7 +18,7 @@ ZSTD_MAGIC = b"\x28\xb5\x2f\xfd"
 REQUIRED: dict[str, tuple[str, ...]] = {
     "Activity": ("activityId", "startDateTime", "data", "weather", "sportType", "name", "distance",
                  "elevation", "averageSpeed", "averageHeartRate", "maxHeartRate", "averageCadence",
-                 "movingTimeInSeconds", "markedForDeletion", "workoutType", "streamsAreImported"),
+                 "movingTimeInSeconds", "markedForDeletion", "workoutType"),
     "ActivityStream": ("activityId", "streamType", "data"),
     "ActivitySplit": ("activityId", "unitSystem", "splitNumber", "distance",
                       "movingTimeInSeconds", "elevationDifference", "gapPaceInSecondsPerKm"),
@@ -46,6 +46,13 @@ def open_db(cfg: Config) -> sqlite3.Connection:
             missing = [c for c in columns if c not in have]
             if missing:
                 raise StravaDbError(f"{path}: table {table} lacks column(s) {', '.join(missing)}")
+        # "streams imported": Activity.streamsAreImported before dreeve v5.5.0, an
+        # ActivityScan table (type 'streams') from v5.5.0 on. One of the two must exist.
+        activity = {row[1] for row in conn.execute("PRAGMA table_info(Activity)")}
+        scan = {row[1] for row in conn.execute("PRAGMA table_info(ActivityScan)")}
+        if "streamsAreImported" not in activity and not {"activityId", "type"} <= scan:
+            raise StravaDbError(f"{path}: neither Activity.streamsAreImported nor an "
+                                "ActivityScan table (statistics-for-strava/dreeve schema changed)")
     except sqlite3.Error as exc:
         raise StravaDbError(f"{path}: cannot read database ({exc})") from exc
     return conn
